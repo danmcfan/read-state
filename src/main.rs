@@ -3,7 +3,7 @@ use std::time::Duration;
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::time;
 
-use readstate::{LRUCache, ReadState};
+use read_state::{LRUCache, ReadState};
 
 const CAPACITY: usize = 20_000_000;
 const WRITE_CYCLE_COUNT: usize = 20_000;
