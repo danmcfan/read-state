@@ -1,12 +1,9 @@
 package main
 
 import (
-	"os"
-	"os/signal"
-	"syscall"
+	"container/list"
+	"math/rand"
 	"time"
-
-	"readstate/internal"
 )
 
 const (
@@ -15,25 +12,61 @@ const (
 	WriteInterval   = 100 * time.Millisecond
 )
 
-func main() {
-	cache := internal.NewLRUCache(Capacity)
-
-	writeTicker := time.NewTicker(WriteInterval)
-
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
-
-	go writeLoop(cache, writeTicker)
-
-	<-stop
-	writeTicker.Stop()
+type entry struct {
+	key   any
+	value any
 }
 
-func writeLoop(c *internal.LRUCache, t *time.Ticker) {
-	for range t.C {
+type LRUCache struct {
+	capacity int
+	cache    map[any]*list.Element
+	list     *list.List
+}
+
+func main() {
+	cache := NewLRUCache(Capacity)
+
+	for {
 		for range WriteCycleCount {
-			rs := internal.NewReadState()
-			c.Put(rs.Key(), rs)
+			k := rand.Int63()
+			v := rand.Int63()
+			cache.Put(k, v)
+		}
+		time.Sleep(WriteInterval)
+	}
+}
+
+func NewLRUCache(capacity int) *LRUCache {
+	return &LRUCache{
+		capacity: capacity,
+		cache:    make(map[any]*list.Element),
+		list:     list.New(),
+	}
+}
+
+func (c *LRUCache) Get(k any) (any, bool) {
+	if elem, ok := c.cache[k]; ok {
+		c.list.MoveToFront(elem)
+		return elem.Value.(*entry).value, true
+	}
+	return nil, false
+}
+
+func (c *LRUCache) Put(k, v any) {
+	if elem, ok := c.cache[k]; ok {
+		c.list.MoveToFront(elem)
+		elem.Value.(*entry).value = v
+		return
+	}
+
+	if len(c.cache) >= c.capacity {
+		oldest := c.list.Back()
+		if oldest != nil {
+			c.list.Remove(oldest)
+			delete(c.cache, oldest.Value.(*entry).key)
 		}
 	}
+
+	elem := c.list.PushFront(&entry{k, v})
+	c.cache[k] = elem
 }
