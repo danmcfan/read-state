@@ -13,13 +13,13 @@ const (
 )
 
 type entry struct {
-	key   any
-	value any
+	key   int64
+	value int64
 }
 
 type LRUCache struct {
 	capacity int
-	cache    map[any]*list.Element
+	cache    map[int64]*list.Element
 	list     *list.List
 }
 
@@ -39,20 +39,20 @@ func main() {
 func NewLRUCache(capacity int) *LRUCache {
 	return &LRUCache{
 		capacity: capacity,
-		cache:    make(map[any]*list.Element),
+		cache:    make(map[int64]*list.Element),
 		list:     list.New(),
 	}
 }
 
-func (c *LRUCache) Get(k any) (any, bool) {
+func (c *LRUCache) Get(k int64) (int64, bool) {
 	if elem, ok := c.cache[k]; ok {
 		c.list.MoveToFront(elem)
 		return elem.Value.(*entry).value, true
 	}
-	return nil, false
+	return 0, false
 }
 
-func (c *LRUCache) Put(k, v any) {
+func (c *LRUCache) Put(k, v int64) {
 	if elem, ok := c.cache[k]; ok {
 		c.list.MoveToFront(elem)
 		elem.Value.(*entry).value = v
