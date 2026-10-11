@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Read State: Go to Rust</title>
+  <meta name="description" content="How Discord rewrote its Read States service from Go to Rust, and a small demo that reproduces the workload.">
+  <style>
+    :root {
+      --bg: #fafaf9;
+      --fg: #1c1917;
+      --muted: #57534e;
+      --card: #ffffff;
+      --border: #e7e5e4;
+      --accent: #5865f2;
+      --go: #00add8;
+      --rust: #ce422b;
+      --code-bg: #f5f5f4;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0c0a09;
+        --fg: #f5f5f4;
+        --muted: #a8a29e;
+        --card: #1c1917;
+        --border: #292524;
+        --accent: #8891f7;
+        --go: #4fc8e8;
+        --rust: #f0765f;
+        --code-bg: #1c1917;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font: 17px/1.65 system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    main { max-width: 720px; margin: 0 auto; padding: 48px 16px 64px; }
+    h1 { font-size: 2.2rem; line-height: 1.2; margin: 0 0 12px; }
+    h2 { font-size: 1.35rem; margin: 48px 0 12px; }
+    p, li { color: var(--fg); }
+    .lede { color: var(--muted); font-size: 1.1rem; margin: 0 0 24px; }
+    a { color: var(--accent); }
+    .go { color: var(--go); font-weight: 600; }
+    .rust { color: var(--rust); font-weight: 600; }
+    .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 18px;
+    }
+    .card h3 { margin: 0 0 8px; font-size: 1.05rem; }
+    .card ul { margin: 0; padding-left: 18px; }
+    .card li { color: var(--muted); font-size: 0.95rem; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      overflow-x: auto;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 600; }
+    footer { margin-top: 56px; color: var(--muted); font-size: 0.9rem; }
+    @media (max-width: 560px) {
+      .cards { grid-template-columns: 1fr; }
+      h1 { font-size: 1.8rem; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Why Discord moved Read States from <span class="go">Go</span> to <span class="rust">Rust</span></h1>
+    <p class="lede">A short explainer of Discord's 2020 rewrite, plus a small demo that reproduces the workload in four languages.</p>
+
+    <h2>What is the Read States service?</h2>
+    <p>Every time you open a channel, Discord needs to know which messages you have already read. The Read States service tracks that: one small record per user, per channel, holding things like the last message read and the mention count.</p>
+    <p>It sits on the hot path. It is hit on every connection, every message sent, and every message read, so it has to be fast all the time, not just on average.</p>
+    <p>To keep it fast, each instance keeps recently used read states in memory in an <strong>LRU cache</strong> holding millions of entries, and writes changes back to the database.</p>
+
+    <h2>The problem: garbage collection spikes</h2>
+    <p>The <span class="go">Go</span> version was mostly fast, but every couple of minutes it showed large latency and CPU spikes.</p>
+    <p>The cause was Go's garbage collector. Go forces a collection at least every two minutes, and each collection has to scan the whole heap to find what is still alive. With an LRU cache holding millions of long-lived entries, that scan was large even though very little garbage was being created.</p>
+    <p>Tuning helped only so much. Shrinking the cache made each scan cheaper, but more requests missed the cache and went to the database, so tail latency got worse.</p>
+
+    <h2>The fix: rewrite it in Rust</h2>
+    <p><span class="rust">Rust</span> has no garbage collector. Memory is freed as soon as its owner goes out of scope, so an evicted cache entry is freed the moment it is evicted. There is no periodic pass over the whole heap.</p>
+    <div class="cards">
+      <div class="card">
+        <h3 class="go">Go version</h3>
+        <ul>
+          <li>Garbage collected</li>
+          <li>Spikes every ~2 minutes as the GC scans the cache</li>
+          <li>Bigger cache meant bigger GC pauses</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3 class="rust">Rust version</h3>
+        <ul>
+          <li>No GC; ownership frees memory on eviction</li>
+          <li>No periodic spikes</li>
+          <li>Cache could grow without a GC cost</li>
+        </ul>
+      </div>
+    </div>
+    <p>Discord reported that even a fairly basic Rust port matched the tuned Go service, and after some optimization it beat Go on latency, CPU, and memory. Without a GC cost, they could also raise the cache capacity, which cut database reads further.</p>
+
+    <h2>The demo in this repo</h2>
+    <p>This repository reproduces the shape of that workload so you can watch the difference yourself. Each program runs a single-threaded LRU cache with a capacity of 20,000,000 entries, writes 20,000 random key/value pairs, sleeps 100ms, and repeats forever.</p>
+    <table>
+      <thead><tr><th>Language</th><th>File</th><th>Cache</th></tr></thead>
+      <tbody>
+        <tr><td>Go</td><td><code>main.go</code></td><td><code>map</code> + <code>container/list</code></td></tr>
+        <tr><td>Rust</td><td><code>src/main.rs</code></td><td><code>HashMap</code> + index-based linked list</td></tr>
+        <tr><td>Odin</td><td><code>main.odin</code></td><td><code>map</code> + index-based linked list</td></tr>
+        <tr><td>Python</td><td><code>main.py</code></td><td><code>OrderedDict</code></td></tr>
+      </tbody>
+    </table>
+    <p>Run one and watch its CPU and memory in a tool like <code>htop</code>:</p>
+<pre><code>go run main.go
+cargo run --release
+odin run main.odin -file -o:speed
+python3 main.py</code></pre>
+
+    <footer>
+      Source: <a href="https://discord.com/blog/why-discord-is-switching-from-go-to-rust">Why Discord is Switching from Go to Rust</a> (Discord blog, 2020).
+      Code: <a href="https://github.com/danmcfan/read-state">github.com/danmcfan/read-state</a>.
+    </footer>
+  </main>
+</body>
+</html>
