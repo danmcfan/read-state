@@ -40,6 +40,7 @@ const goRun = `{"type":"env","variant":"go-x","profile":"quick","git_commit":"ab
 {"type":"sec","t":1.0,"ops":100,"hits":0,"misses":100,"evictions":0,"entries":90,"batch_us":[1,2],"batch_p99_us":2,"batch_max_us":2,"cpu_pct":10,"heap_live_bytes":1048576,"scan_heap_bytes":5}
 {"type":"sec","t":2.0,"ops":100,"hits":80,"misses":20,"evictions":10,"entries":100,"batch_us":[3,4],"batch_p99_us":4,"batch_max_us":4,"cpu_pct":20,"heap_live_bytes":2097152,"scan_heap_bytes":6}
 {"type":"gc","t":2.6,"cycles":1,"n_end":2,"kind":"periodic","gc_cpu_s":0.5,"mark_assist_s":0.1,"pause_s":0.0002}
+{"type":"gc","t":2.8,"cycles":3,"n_end":5,"kind":"heap","gc_cpu_s":0.03,"mark_assist_s":0,"pause_s":0.0009,"pause_max_s":0.0005}
 {"type":"sec","t":3.0,"ops":100,"hits":80,"misses":20,"evictions":20,"entries":100,"batch_us":[5,100],"batch_p99_us":100,"batch_max_us":100,"cpu_pct":40,"heap_live_bytes":2097152,"scan_heap_bytes":7}
 {"type":"end","t":4.0,"ops":300,"hits":160,"misses":140,"evictions":30,"entries":100,"batches":6,"cpu_s":1}
 {"type":"proc","t":1,"rss_bytes":1048576}
@@ -86,14 +87,14 @@ func TestSummarize(t *testing.T) {
 	if h.BatchP50US != 4 || h.BatchMaxUS != 100 || h.RSSBytesMedian != 2097152 || h.RSSBytesMax != 4194304 {
 		t.Errorf("headline batches/rss: %+v", h)
 	}
-	if h.GC == nil || h.GC.Cycles != 1 || h.GC.PeriodicCycles != 1 || h.GC.CPUSPerPeriodicMedian != 0.5 ||
-		h.GC.PauseMaxMS != 0.2 || h.GC.HeapLiveBytes != 2097152 {
+	if h.GC == nil || h.GC.Cycles != 4 || h.GC.PeriodicCycles != 1 || h.GC.CPUSPerPeriodicMedian != 0.5 ||
+		h.GC.PauseMaxMS != 0.5 || h.GC.HeapLiveBytes != 2097152 {
 		t.Errorf("gc headline: %+v", h.GC)
 	}
 	if len(g.Series.T) != 3 || g.Series.RSSMB[0] == nil || *g.Series.RSSMB[0] != 1 || *g.Series.HeapLiveMB[1] != 2 {
 		t.Errorf("series: %+v", g.Series)
 	}
-	if len(g.GCEvents) != 2 {
+	if len(g.GCEvents) != 3 {
 		t.Errorf("gc events: %+v", g.GCEvents)
 	}
 

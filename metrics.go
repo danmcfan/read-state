@@ -272,8 +272,15 @@ func (r *recorder) writeGC() {
 	if i := numGC - cycles; i < uint64(len(ends)) {
 		t = ends[i]
 	}
+	// Pause[i] is the total stop-the-world pause of cycle NumGC-i, newest
+	// first, so a multi-cycle record can report its largest single pause.
+	pauses := r.gcStats.Pause
+	var pauseMax time.Duration
 	r.intervals = r.intervals[:0]
 	for n := prev.cycles + 1; n <= cycles; n++ {
+		if i := numGC - n; i < uint64(len(pauses)) {
+			pauseMax = max(pauseMax, pauses[i])
+		}
 		iv := time.Duration(-1)
 		if i := numGC - n; i+1 < uint64(len(ends)) {
 			iv = ends[i].Sub(ends[i+1])
@@ -295,6 +302,7 @@ func (r *recorder) writeGC() {
 	j.num("mark_idle_s", cur.markIdle-prev.markIdle, 6)
 	j.num("pause_cpu_s", cur.pauseCPU-prev.pauseCPU, 6)
 	j.num("pause_s", (cur.pauseTotal - prev.pauseTotal).Seconds(), 6)
+	j.num("pause_max_s", pauseMax.Seconds(), 6)
 	j.uint("heap_live_bytes", s[mHeapLive].Value.Uint64())
 	j.uint("scan_heap_bytes", s[mScanHeap].Value.Uint64())
 	j.end()

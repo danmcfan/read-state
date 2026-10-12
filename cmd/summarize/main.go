@@ -59,23 +59,24 @@ type record struct {
 	Compact           *bool    `json:"compact"`
 
 	// sec, gc, end, proc
-	T          float64 `json:"t"`
-	Ops        int64   `json:"ops"`
-	Hits       int64   `json:"hits"`
-	Misses     int64   `json:"misses"`
-	Entries    int64   `json:"entries"`
-	BatchUS    []int64 `json:"batch_us"`
-	BatchP99US int64   `json:"batch_p99_us"`
-	BatchMaxUS int64   `json:"batch_max_us"`
-	CPUPct     float64 `json:"cpu_pct"`
-	HeapLive   *int64  `json:"heap_live_bytes"`
-	ScanHeap   *int64  `json:"scan_heap_bytes"`
-	Cycles     int64   `json:"cycles"`
-	Kind       string  `json:"kind"`
-	GCCPUS     float64 `json:"gc_cpu_s"`
-	AssistS    float64 `json:"mark_assist_s"`
-	PauseS     float64 `json:"pause_s"`
-	RSSBytes   int64   `json:"rss_bytes"`
+	T          float64  `json:"t"`
+	Ops        int64    `json:"ops"`
+	Hits       int64    `json:"hits"`
+	Misses     int64    `json:"misses"`
+	Entries    int64    `json:"entries"`
+	BatchUS    []int64  `json:"batch_us"`
+	BatchP99US int64    `json:"batch_p99_us"`
+	BatchMaxUS int64    `json:"batch_max_us"`
+	CPUPct     float64  `json:"cpu_pct"`
+	HeapLive   *int64   `json:"heap_live_bytes"`
+	ScanHeap   *int64   `json:"scan_heap_bytes"`
+	Cycles     int64    `json:"cycles"`
+	Kind       string   `json:"kind"`
+	GCCPUS     float64  `json:"gc_cpu_s"`
+	AssistS    float64  `json:"mark_assist_s"`
+	PauseS     float64  `json:"pause_s"`
+	PauseMaxS  *float64 `json:"pause_max_s"`
+	RSSBytes   int64    `json:"rss_bytes"`
 }
 
 type host struct {
@@ -443,8 +444,12 @@ func computeHeadline(r *run, si int, capacity int64, isGo bool) *headline {
 				periodicAssist = append(periodicAssist, e.AssistS)
 			}
 		}
-		if e.Cycles > 0 {
-			g.PauseMaxMS = max(g.PauseMaxMS, round(e.PauseS/float64(e.Cycles)*1000, 3))
+		switch {
+		case e.PauseMaxS != nil:
+			g.PauseMaxMS = max(g.PauseMaxMS, round(*e.PauseMaxS*1000, 3))
+		case e.Cycles == 1:
+			// Older records without pause_max_s: a single cycle's total is its max.
+			g.PauseMaxMS = max(g.PauseMaxMS, round(e.PauseS*1000, 3))
 		}
 	}
 	slices.Sort(periodicCPU)
