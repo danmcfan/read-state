@@ -21,7 +21,7 @@ The cache fills in about 22 seconds, which leaves about 7 periodic collections i
 
 ### Go baseline vs Rust baseline (#2)
 
-On the same workload both do about 180,000 operations a second at an 80% hit rate. Rust averaged 5.5% of one core (max 10.2%) with no periodic spikes; Go averaged 9.5% but jumped to 29–48% in the second of each periodic GC, which marked about 200 MB of live heap with 0.23–0.49 s of CPU every 20 s.
+On the same workload both do about 180,000 operations a second at an 80% hit rate. Rust averaged 5.5% of one core (max 10.2%) with no periodic spikes; Go averaged 9.8% but jumped to 28–38% in the second of each periodic GC, which marked about 200 MB of live heap with 0.23–0.33 s of CPU every 20 s.
 
 Go used 254 MiB of RSS (133 bytes per entry, 56 of them the entry and its list element) against Rust's 160 MiB (84 bytes per entry, 48 of them the entry). Batch-latency tails were dominated by noise from other work on the host for both languages (see the caveats), so they don't yet separate the two.
 
