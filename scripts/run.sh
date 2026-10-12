@@ -89,6 +89,20 @@ variant() {
 	rust-baseline)
 		lang=rust label="Rust, HashMap + index list"
 		issue=2 group=rust ;;
+	# Discord's Rust changes: a BTreeMap index, a smaller entry (u32 links
+	# and map values), and a bigger cache (2x capacity, baseline structure).
+	rust-btree)
+		lang=rust args="--map=btree" label="Rust, BTreeMap"
+		issue=4 group=rust ;;
+	rust-compact)
+		lang=rust args="--compact" label="Rust, compact entries (u32 links)"
+		issue=4 group=rust ;;
+	rust-btree-compact)
+		lang=rust args="--map=btree --compact" label="Rust, BTreeMap + compact"
+		issue=4 group=rust ;;
+	rust-cap-4M)
+		lang=rust args="--capacity=4000000" label="Rust, 2× capacity (4M)"
+		issue=4 group=rust ;;
 	# END MATRIX
 	*) return 1 ;;
 	esac
