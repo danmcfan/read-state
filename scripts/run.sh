@@ -144,9 +144,29 @@ build() {
 	cargo build --release --quiet
 }
 
+# matrix_json ORDER prints the current variant's matrix metadata as a JSON
+# object (call variant NAME first).
+matrix_json() {
+	printf '{"order":%d,"label":%s,"issue":%d,"group":%s,"go192":%s}' \
+		"$1" "$(json_str "$label")" "$issue" "$(json_str "$group")" "$go192"
+}
+
+# summarize passes the current matrix to cmd/summarize, so the summary's order
+# and metadata follow this script even for results recorded before rows were
+# added or changed.
 summarize() {
 	echo "== summarize $OUT_DIR" >&2
-	go run ./cmd/summarize --in="$OUT_DIR"
+	matrix=$(mktemp "${TMPDIR:-/tmp}/read-state-matrix.XXXXXX")
+	i=0
+	for v in $(variants); do
+		i=$((i + 1))
+		variant "$v"
+		printf '{"variant":%s,%s\n' "$(json_str "$v")" "$(matrix_json "$i" | cut -c2-)"
+	done >"$matrix"
+	rc=0
+	go run ./cmd/summarize --in="$OUT_DIR" --matrix="$matrix" || rc=$?
+	rm -f "$matrix"
+	return "$rc"
 }
 
 # run_variant NAME ORDER runs one variant and writes $OUT_DIR/NAME.jsonl.
@@ -178,8 +198,7 @@ run_variant() {
 		printf '"go_version":%s,"rust_version":%s,"cargo_version":%s,' \
 			"$(json_str "$(go env GOVERSION)")" "$(json_str "$(rustc --version)")" \
 			"$(json_str "$(cargo --version)")"
-		printf '"matrix":{"order":%d,"label":%s,"issue":%d,"group":%s,"go192":%s}}\n' \
-			"$order" "$(json_str "$label")" "$issue" "$(json_str "$group")" "$go192"
+		printf '"matrix":%s}\n' "$(matrix_json "$order")"
 	} >"$out"
 
 	echo "== $v: $cmd" >&2

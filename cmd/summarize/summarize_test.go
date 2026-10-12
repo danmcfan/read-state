@@ -131,3 +131,32 @@ func TestNoPeriodicCyclesIsNull(t *testing.T) {
 		}
 	}
 }
+
+func TestMatrixOverridesRecordedOrder(t *testing.T) {
+	// go-x recorded order 1 when it was run; the current matrix puts it after rust-y.
+	p := filepath.Join(t.TempDir(), "matrix.jsonl")
+	rows := `{"variant":"rust-y","order":1,"label":"Rust Y","issue":2,"group":"rust","go192":null}
+{"variant":"go-x","order":2,"label":"Go X now","issue":3,"group":"go-baseline","go192":true}
+`
+	if err := os.WriteFile(p, []byte(rows), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	m, err := readMatrix(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runs := []*run{readFixture(t, "go-x", goRun), readFixture(t, "rust-y", rustShort)}
+	for _, r := range runs {
+		r.matrix = m[r.id]
+	}
+	s := build(runs, time.Unix(0, 0), io.Discard)
+	if s.Variants[0].ID != "rust-y" || s.Variants[1].ID != "go-x" {
+		t.Fatalf("variant order: %s, %s", s.Variants[0].ID, s.Variants[1].ID)
+	}
+	if g := s.Variants[1]; g.Label != "Go X now" || g.Issue == nil || *g.Issue != 3 {
+		t.Errorf("metadata not from the matrix: %+v", g)
+	}
+	if r := s.Variants[0]; r.Label != "Rust Y" || r.Go192 != nil {
+		t.Errorf("rust metadata: %+v", r)
+	}
+}

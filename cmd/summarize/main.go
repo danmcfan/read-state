@@ -88,11 +88,12 @@ type host struct {
 }
 
 type matrix struct {
-	Order int    `json:"order"`
-	Label string `json:"label"`
-	Issue int    `json:"issue"`
-	Group string `json:"group"`
-	Go192 *bool  `json:"go192"`
+	Variant string `json:"variant,omitempty"` // only in a --matrix file
+	Order   int    `json:"order"`
+	Label   string `json:"label"`
+	Issue   int    `json:"issue"`
+	Group   string `json:"group"`
+	Go192   *bool  `json:"go192"`
 }
 
 // run is one variant's parsed file.
@@ -103,6 +104,21 @@ type run struct {
 	secs   []record
 	gcs    []record
 	procs  []record
+	// matrix is the variant's row in the current matrix (--matrix), which
+	// overrides the one env recorded when the variant was run.
+	matrix *matrix
+}
+
+// meta returns the variant's matrix metadata: the current matrix row if
+// there is one, else what env recorded at run time, else nil.
+func (r *run) meta() *matrix {
+	if r.matrix != nil {
+		return r.matrix
+	}
+	if r.env != nil {
+		return r.env.Matrix
+	}
+	return nil
 }
 
 func readRun(path string) (*run, error) {
@@ -307,8 +323,7 @@ func nearestProc(procs []record, t float64) (int64, bool) {
 func summarizeRun(r *run, stderr io.Writer) variant {
 	c := r.config
 	v := variant{ID: r.id, Lang: c.Lang, GCEvents: []gcEvent{}}
-	if r.env != nil && r.env.Matrix != nil {
-		m := r.env.Matrix
+	if m := r.meta(); m != nil {
 		v.Label, v.Group, v.Go192 = m.Label, m.Group, m.Go192
 		v.Issue = &m.Issue
 	}
@@ -473,8 +488,8 @@ func computeHeadline(r *run, si int, capacity int64, isGo bool) *headline {
 }
 
 func order(r *run) int {
-	if r.env != nil && r.env.Matrix != nil && r.env.Matrix.Order > 0 {
-		return r.env.Matrix.Order
+	if m := r.meta(); m != nil && m.Order > 0 {
+		return m.Order
 	}
 	return math.MaxInt
 }
@@ -526,8 +541,31 @@ func build(runs []*run, now time.Time, stderr io.Writer) summary {
 	return out
 }
 
+// readMatrix reads a --matrix file: one JSON object per line with the
+// variant's name and its current order, label, issue, group and go192, as
+// scripts/run.sh prints them.
+func readMatrix(path string) (map[string]*matrix, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]*matrix{}
+	for i, line := range bytes.Split(b, []byte("\n")) {
+		if len(bytes.TrimSpace(line)) == 0 {
+			continue
+		}
+		m := &matrix{}
+		if err := json.Unmarshal(line, m); err != nil || m.Variant == "" {
+			return nil, fmt.Errorf("%s:%d: bad matrix row: %q", path, i+1, line)
+		}
+		out[m.Variant] = m
+	}
+	return out, nil
+}
+
 func main() {
 	in := flag.String("in", "results", "directory of <variant>.jsonl files")
+	matrixPath := flag.String("matrix", "", "JSONL of the current matrix rows; overrides the order and metadata recorded at run time")
 	flag.Parse()
 
 	paths, err := filepath.Glob(filepath.Join(*in, "*.jsonl"))
@@ -543,6 +581,20 @@ func main() {
 			os.Exit(1)
 		}
 		runs = append(runs, r)
+	}
+	if *matrixPath != "" {
+		m, err := readMatrix(*matrixPath)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "summarize:", err)
+			os.Exit(1)
+		}
+		for _, r := range runs {
+			if row, ok := m[r.id]; ok {
+				r.matrix = row
+			} else {
+				fmt.Fprintf(os.Stderr, "summarize: warning: %s is not in the current matrix\n", r.id)
+			}
+		}
 	}
 	b, err := json.MarshalIndent(build(runs, time.Now(), os.Stderr), "", " ")
 	if err != nil {
