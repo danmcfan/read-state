@@ -229,14 +229,14 @@ type headline struct {
 }
 
 type gcHeadline struct {
-	Cycles                   int64   `json:"cycles"`
-	PeriodicCycles           int64   `json:"periodic_cycles"`
-	CPUSPerPeriodicMedian    float64 `json:"cpu_s_per_periodic_median"`
-	CPUSPerPeriodicMax       float64 `json:"cpu_s_per_periodic_max"`
-	AssistSPerPeriodicMedian float64 `json:"assist_s_per_periodic_median"`
-	PauseMaxMS               float64 `json:"pause_max_ms"`
-	ScanHeapBytes            int64   `json:"scan_heap_bytes"`
-	HeapLiveBytes            int64   `json:"heap_live_bytes"`
+	Cycles                   int64    `json:"cycles"`
+	PeriodicCycles           int64    `json:"periodic_cycles"`
+	CPUSPerPeriodicMedian    *float64 `json:"cpu_s_per_periodic_median"`
+	CPUSPerPeriodicMax       *float64 `json:"cpu_s_per_periodic_max"`
+	AssistSPerPeriodicMedian *float64 `json:"assist_s_per_periodic_median"`
+	PauseMaxMS               float64  `json:"pause_max_ms"`
+	ScanHeapBytes            int64    `json:"scan_heap_bytes"`
+	HeapLiveBytes            int64    `json:"heap_live_bytes"`
 }
 
 type series struct {
@@ -272,6 +272,8 @@ func percentile[T int64 | float64](sorted []T, p float64) T {
 	i := int(math.Ceil(p*float64(len(sorted)))) - 1
 	return sorted[max(0, min(i, len(sorted)-1))]
 }
+
+func ptr[T any](v T) *T { return &v }
 
 func median[T int64 | float64](v []T) T {
 	s := slices.Clone(v)
@@ -452,10 +454,14 @@ func computeHeadline(r *run, si int, capacity int64, isGo bool) *headline {
 			g.PauseMaxMS = max(g.PauseMaxMS, round(e.PauseS*1000, 3))
 		}
 	}
-	slices.Sort(periodicCPU)
-	g.CPUSPerPeriodicMedian = round(percentile(periodicCPU, 0.5), 3)
-	g.CPUSPerPeriodicMax = round(percentile(periodicCPU, 1), 3)
-	g.AssistSPerPeriodicMedian = round(median(periodicAssist), 3)
+	// With no single-cycle periodic records (for example when heap-triggered
+	// cycles always come before the period runs out) these stay null.
+	if len(periodicCPU) > 0 {
+		slices.Sort(periodicCPU)
+		g.CPUSPerPeriodicMedian = ptr(round(percentile(periodicCPU, 0.5), 3))
+		g.CPUSPerPeriodicMax = ptr(round(percentile(periodicCPU, 1), 3))
+		g.AssistSPerPeriodicMedian = ptr(round(median(periodicAssist), 3))
+	}
 	if len(scanHeap) > 0 {
 		g.ScanHeapBytes = median(scanHeap)
 	}
