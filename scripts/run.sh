@@ -251,15 +251,13 @@ run() {
 	trap 'rm -f "$tmp"' EXIT
 	trap '[ -n "$pid" ] && kill "$pid" 2>/dev/null; exit 130' INT TERM
 	failed=
-	n=0
 	for v in "$@"; do
-		n=$((n + 1))
 		order=$(variants | grep -n -x -- "$v" | cut -d: -f1)
 		run_variant "$v" "$order"
-		if [ "$n" -lt "$#" ]; then
-			echo "== cooldown ${COOLDOWN}s" >&2
-			sleep "$COOLDOWN"
-		fi
+		# Cool down after every variant, the last one included, so separate
+		# run.sh calls made back to back still get the gap.
+		echo "== cooldown ${COOLDOWN}s" >&2
+		sleep "$COOLDOWN"
 	done
 	summarize
 	if [ -n "$failed" ]; then
