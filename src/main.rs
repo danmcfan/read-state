@@ -6,12 +6,13 @@
 //! workload for measurement runs, and `--out` writes one JSON line per second
 //! of metrics (see results/README.md for the schema).
 
+mod cache;
+
+use cache::{BTreeCompact, BTreeWide, Cache, HashCompact, HashWide};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
-use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::fs::OpenOptions;
-use std::hash::Hash;
 use std::io::{self, BufWriter, Write};
 use std::process::exit;
 use std::thread::sleep;
@@ -19,6 +20,7 @@ use std::time::{Duration, Instant};
 
 const USAGE: &str = "usage: read-state [--capacity=N] [--keys=N] [--batch=N] [--sleep=DUR]
                   [--read-ratio=F] [--duration=DUR] [--out=PATH|-] [--variant=NAME] [--seed=N]
+                  [--map=hash|btree] [--compact]
   --capacity    total cache entries (default 20000000)
   --keys        keys are drawn from [0, keys); 0 means capacity*5/4 (default 0)
   --batch       operations per timed batch (default 20000)
@@ -28,6 +30,9 @@ const USAGE: &str = "usage: read-state [--capacity=N] [--keys=N] [--batch=N] [--
   --out         append JSONL metrics to this file ('-' for stdout); empty writes none
   --variant     variant name recorded in the config record
   --seed        random seed (default 1)
+  --map         key index: hash (HashMap, preallocated) or btree (BTreeMap) (default hash)
+  --compact     u32 links with a sentinel and u32 map values instead of Option<usize>
+                (entry 48 -> 24 bytes); also --compact=true|false
 Durations are a whole number with ms, s, m or h, or 0. Flags take --name=value or --name value.";
 
 struct Config {
@@ -40,6 +45,8 @@ struct Config {
     out: String,
     variant: String,
     seed: u64,
+    btree: bool,
+    compact: bool,
 }
 
 impl Default for Config {
@@ -55,6 +62,8 @@ impl Default for Config {
             out: String::new(),
             variant: String::new(),
             seed: 1,
+            btree: false,
+            compact: false,
         }
     }
 }
@@ -97,6 +106,11 @@ fn parse_args(args: &[String]) -> Result<Config, String> {
             println!("{USAGE}");
             exit(0);
         }
+        // --compact is a boolean: bare, it never takes the next argument.
+        if flag == "compact" {
+            c.compact = true;
+            continue;
+        }
         let (name, value) = match flag.split_once('=') {
             Some((n, v)) => (n, v.to_string()),
             None => {
@@ -122,6 +136,20 @@ fn parse_args(args: &[String]) -> Result<Config, String> {
             "out" => c.out = value,
             "variant" => c.variant = value,
             "seed" => c.seed = parse_int(v)?,
+            "map" => {
+                c.btree = match v {
+                    "hash" => false,
+                    "btree" => true,
+                    _ => return Err(format!("--map must be hash or btree, got {v:?}")),
+                }
+            }
+            "compact" => {
+                c.compact = match v {
+                    "true" => true,
+                    "false" => false,
+                    _ => return Err(format!("--compact must be true or false, got {v:?}")),
+                }
+            }
             _ => return Err(format!("unknown flag --{name}")),
         }
     }
@@ -130,6 +158,9 @@ fn parse_args(args: &[String]) -> Result<Config, String> {
     }
     if c.capacity == 0 || c.keys == 0 || c.batch == 0 {
         return Err("--capacity, --keys and --batch must be positive".into());
+    }
+    if c.compact && c.capacity >= u32::MAX as usize {
+        return Err("--compact needs --capacity below 4294967295".into());
     }
     Ok(c)
 }
@@ -155,11 +186,11 @@ impl Counts {
 /// Runs one operation. With a read ratio of 0 every operation is a put, as in
 /// the original program. A get that misses loads the key, which is a put. A
 /// miss is any operation whose key wasn't cached.
-fn op(cache: &mut LRUCache<i64, i64>, rng: &mut StdRng, cfg: &Config, c: &mut Counts) {
+fn op<C: Cache>(cache: &mut C, rng: &mut StdRng, cfg: &Config, c: &mut Counts) {
     c.ops += 1;
     let key = rng.gen_range(0..cfg.keys);
     if cfg.read_ratio > 0.0 && rng.gen_bool(cfg.read_ratio) {
-        if cache.get(&key).is_some() {
+        if cache.get(key).is_some() {
             c.hits += 1;
             return;
         }
@@ -188,12 +219,23 @@ fn main() {
         exit(2);
     });
 
-    let mut cache = LRUCache::new(cfg.capacity);
+    // Dispatch once; each variant is its own monomorphized loop.
+    match (cfg.btree, cfg.compact) {
+        (false, false) => run(HashWide::new(cfg.capacity), &cfg, start),
+        (false, true) => run(HashCompact::new(cfg.capacity), &cfg, start),
+        (true, false) => run(BTreeWide::new(cfg.capacity), &cfg, start),
+        (true, true) => run(BTreeCompact::new(cfg.capacity), &cfg, start),
+    }
+}
+
+/// The measurement loop: batches of operations, a sleep after each, and the
+/// metrics records when --out is set.
+fn run<C: Cache>(mut cache: C, cfg: &Config, start: Instant) -> ! {
     let mut rng = StdRng::seed_from_u64(cfg.seed);
     let mut rec = if cfg.out.is_empty() {
         None
     } else {
-        Some(Recorder::new(&cfg, start).unwrap_or_else(|e| {
+        Some(Recorder::new::<C>(cfg, start).unwrap_or_else(|e| {
             eprintln!("read-state: {}: {e}", cfg.out);
             exit(1);
         }))
@@ -205,7 +247,7 @@ fn main() {
     loop {
         let t0 = Instant::now();
         for _ in 0..cfg.batch {
-            op(&mut cache, &mut rng, &cfg, &mut win);
+            op(&mut cache, &mut rng, cfg, &mut win);
         }
         let d = t0.elapsed();
         sleep(cfg.sleep);
@@ -244,7 +286,7 @@ struct Recorder {
 }
 
 impl Recorder {
-    fn new(cfg: &Config, start: Instant) -> io::Result<Recorder> {
+    fn new<C: Cache>(cfg: &Config, start: Instant) -> io::Result<Recorder> {
         let out: Box<dyn Write> = if cfg.out == "-" {
             Box::new(io::stdout())
         } else {
@@ -274,14 +316,16 @@ impl Recorder {
             l,
             ",\"capacity\":{cap},\"capacity_effective\":{cap},\"keys\":{},\"batch\":{},\
              \"sleep_ms\":{},\"read_ratio\":{},\"duration_s\":{},\"seed\":{},\"entry_bytes\":{},\
-             \"map\":\"hash\",\"compact\":false}}",
+             \"map\":\"{}\",\"compact\":{}}}",
             cfg.keys,
             cfg.batch,
             cfg.sleep.as_secs_f64() * 1000.0,
             cfg.read_ratio,
             cfg.duration.as_secs_f64(),
             cfg.seed,
-            std::mem::size_of::<Entry<i64, i64>>(),
+            C::ENTRY_BYTES,
+            C::MAP,
+            C::COMPACT,
             cap = cfg.capacity,
         );
         r.w.write_all(r.line.as_bytes())?;
@@ -410,120 +454,6 @@ fn cpu_seconds() -> f64 {
     tv(ru.ru_utime) + tv(ru.ru_stime)
 }
 
-struct Entry<K, V> {
-    key: K,
-    value: V,
-    prev: Option<usize>,
-    next: Option<usize>,
-}
-
-pub struct LRUCache<K, V> {
-    capacity: usize,
-    map: HashMap<K, usize>,
-    entries: Vec<Entry<K, V>>,
-    head: Option<usize>,
-    tail: Option<usize>,
-}
-
-impl<K: Eq + Hash + Clone, V> LRUCache<K, V> {
-    pub fn new(capacity: usize) -> Self {
-        LRUCache {
-            capacity,
-            map: HashMap::with_capacity(capacity),
-            entries: Vec::with_capacity(capacity),
-            head: None,
-            tail: None,
-        }
-    }
-
-    pub fn len(&self) -> usize {
-        self.map.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.map.is_empty()
-    }
-
-    /// Returns the value for `key`. A hit moves the key to the front.
-    pub fn get(&mut self, key: &K) -> Option<&V> {
-        if let Some(&index) = self.map.get(key) {
-            self.move_to_front(index);
-            Some(&self.entries[index].value)
-        } else {
-            None
-        }
-    }
-
-    /// Stores `value` for `key` and returns (existed, evicted). An existing
-    /// key is updated and moved to the front.
-    pub fn put(&mut self, key: K, value: V) -> (bool, bool) {
-        if let Some(&index) = self.map.get(&key) {
-            self.entries[index].value = value;
-            self.move_to_front(index);
-            return (true, false);
-        }
-
-        let entry = Entry {
-            key: key.clone(),
-            value,
-            prev: None,
-            next: None,
-        };
-        let evicted = self.map.len() >= self.capacity;
-        let index = if evicted {
-            // Reuse the evicted slot so `entries` never grows past capacity.
-            let index = self.remove_tail();
-            self.entries[index] = entry;
-            index
-        } else {
-            self.entries.push(entry);
-            self.entries.len() - 1
-        };
-        self.push_front(index);
-        self.map.insert(key, index);
-        (false, evicted)
-    }
-
-    fn move_to_front(&mut self, index: usize) {
-        if Some(index) != self.head {
-            self.unlink(index);
-            self.push_front(index);
-        }
-    }
-
-    fn push_front(&mut self, index: usize) {
-        self.entries[index].prev = None;
-        self.entries[index].next = self.head;
-        if let Some(head) = self.head {
-            self.entries[head].prev = Some(index);
-        }
-        self.head = Some(index);
-        if self.tail.is_none() {
-            self.tail = Some(index);
-        }
-    }
-
-    fn unlink(&mut self, index: usize) {
-        let prev = self.entries[index].prev;
-        let next = self.entries[index].next;
-        match prev {
-            Some(prev) => self.entries[prev].next = next,
-            None => self.head = next,
-        }
-        match next {
-            Some(next) => self.entries[next].prev = prev,
-            None => self.tail = prev,
-        }
-    }
-
-    fn remove_tail(&mut self) -> usize {
-        let tail = self.tail.expect("a full cache has a tail");
-        self.unlink(tail);
-        self.map.remove(&self.entries[tail].key);
-        tail
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -543,6 +473,7 @@ mod tests {
         assert!(c.duration.is_zero());
         assert!(c.out.is_empty());
         assert_eq!(c.seed, 1);
+        assert!(!c.btree && !c.compact);
     }
 
     #[test]
@@ -575,24 +506,29 @@ mod tests {
     }
 
     #[test]
+    fn map_and_compact_flags() {
+        let c = parse_args(&args(&["--compact", "--map", "btree"])).unwrap();
+        assert!(c.btree && c.compact);
+        // A bare --compact doesn't swallow the next flag.
+        let c = parse_args(&args(&["--compact", "--capacity=10"])).unwrap();
+        assert!(c.compact);
+        assert_eq!(c.capacity, 10);
+        let c = parse_args(&args(&["--map=hash", "--compact"])).unwrap();
+        assert!(!c.btree && c.compact);
+        let c = parse_args(&args(&["--compact=false"])).unwrap();
+        assert!(!c.compact);
+        for bad in [&["--map=foo"][..], &["--map"], &["--compact=yes"]] {
+            assert!(parse_args(&args(bad)).is_err(), "{bad:?}");
+        }
+    }
+
+    #[test]
     fn durations() {
         assert_eq!(parse_duration("100ms").unwrap(), Duration::from_millis(100));
         assert_eq!(parse_duration("2m").unwrap(), Duration::from_secs(120));
         assert_eq!(parse_duration("1h").unwrap(), Duration::from_secs(3600));
         assert_eq!(parse_duration("0").unwrap(), Duration::ZERO);
         assert!(parse_duration("1.5s").is_err());
-    }
-
-    #[test]
-    fn lru_order_and_counts() {
-        let mut c = LRUCache::new(2);
-        assert_eq!(c.put(1, 10), (false, false));
-        assert_eq!(c.put(2, 20), (false, false));
-        assert_eq!(c.put(1, 11), (true, false));
-        assert_eq!(c.put(3, 30), (false, true));
-        assert!(c.get(&2).is_none());
-        assert_eq!(c.get(&1), Some(&11));
-        assert_eq!(c.len(), 2);
     }
 
     #[test]
@@ -603,7 +539,7 @@ mod tests {
             read_ratio: 0.5,
             ..Config::default()
         };
-        let mut cache = LRUCache::new(cfg.capacity);
+        let mut cache = HashWide::new(cfg.capacity);
         let mut rng = StdRng::seed_from_u64(1);
         let mut c = Counts::default();
         for _ in 0..1000 {
