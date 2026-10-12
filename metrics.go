@@ -77,7 +77,7 @@ type recorder struct {
 	intervals []time.Duration
 }
 
-func newRecorder(cfg config, start time.Time, entryBytes int) (*recorder, error) {
+func newRecorder(cfg config, start time.Time, entryBytes, capacityEffective int) (*recorder, error) {
 	r := &recorder{
 		start:     start,
 		gcpercent: cfg.gcpercent,
@@ -106,11 +106,11 @@ func newRecorder(cfg config, start time.Time, entryBytes int) (*recorder, error)
 		r.f = f
 		r.w = bufio.NewWriter(f)
 	}
-	r.writeConfig(cfg, entryBytes)
+	r.writeConfig(cfg, entryBytes, capacityEffective)
 	return r, r.w.Flush()
 }
 
-func (r *recorder) writeConfig(cfg config, entryBytes int) {
+func (r *recorder) writeConfig(cfg config, entryBytes, capacityEffective int) {
 	goexperiment := ""
 	if bi, ok := debug.ReadBuildInfo(); ok {
 		for _, s := range bi.Settings {
@@ -125,7 +125,7 @@ func (r *recorder) writeConfig(cfg config, entryBytes int) {
 	j.str("lang", "go")
 	j.str("variant", cfg.variant)
 	j.int("capacity", int64(cfg.capacity))
-	j.int("capacity_effective", int64(cfg.capacity))
+	j.int("capacity_effective", int64(capacityEffective))
 	j.int("keys", cfg.keys)
 	j.int("batch", int64(cfg.batch))
 	j.num("sleep_ms", float64(cfg.sleep)/float64(time.Millisecond), -1)
@@ -134,7 +134,7 @@ func (r *recorder) writeConfig(cfg config, entryBytes int) {
 	j.uint("seed", cfg.seed)
 	j.int("entry_bytes", int64(entryBytes))
 	j.str("layout", cfg.layout)
-	j.int("shards", 1)
+	j.int("shards", int64(cfg.shards))
 	j.int("gcpercent", int64(cfg.gcpercent))
 	j.num("gcperiod_s", gcPeriod().Seconds(), -1)
 	j.str("gcperiod_mechanism", gcPeriodMechanism)

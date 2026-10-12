@@ -15,7 +15,7 @@ func TestParseFlagsDefaultsAreFaithful(t *testing.T) {
 	}
 	want := config{
 		capacity: 20_000_000, keys: 25_000_000, batch: 20_000, sleep: 100 * time.Millisecond,
-		readRatio: 0, duration: 0, out: "", seed: 1, layout: "list", gcpercent: 100,
+		readRatio: 0, duration: 0, out: "", seed: 1, layout: "list", shards: 1, gcpercent: 100,
 		gcperiod: 2 * time.Minute,
 	}
 	if c != want {
@@ -35,7 +35,8 @@ func TestParseFlags(t *testing.T) {
 	}
 	for _, bad := range [][]string{
 		{"--capacity=0"}, {"--keys=-1"}, {"--batch=0"}, {"--sleep=-1s"}, {"--read-ratio=1.5"},
-		{"--read-ratio=NaN"}, {"--duration=-1s"}, {"--gcperiod=0"}, {"--layout=slab"},
+		{"--read-ratio=NaN"}, {"--duration=-1s"}, {"--gcperiod=0"}, {"--layout=slab"}, {"--shards=0"}, {"--capacity=4", "--shards=5"},
+		{"--gcpercent=-2"},
 		{"--nope"}, {"extra"},
 	} {
 		if _, err := parseFlags(bad, io.Discard); err == nil {
@@ -164,7 +165,7 @@ func TestJSONWriter(t *testing.T) {
 func TestRecorderAllocations(t *testing.T) {
 	cfg, _ := parseFlags([]string{"--out=" + t.TempDir() + "/m.jsonl"}, io.Discard)
 	start := time.Now()
-	r, err := newRecorder(cfg, start, listEntryBytes)
+	r, err := newRecorder(cfg, start, listEntryBytes, cfg.capacity)
 	if err != nil {
 		t.Fatal(err)
 	}
