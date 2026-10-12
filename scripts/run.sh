@@ -57,6 +57,35 @@ variant() {
 	go-baseline)
 		lang=go args="--layout=list" label="Go, map + container/list"
 		issue=2 group=go-baseline go192=true ;;
+	# Discord's step 1: GC percent (100 is go-baseline).
+	go-gcpercent-50)
+		lang=go args="--gcpercent=50" label="Go, GC percent 50"
+		issue=3 group=go-gcpercent go192=true ;;
+	go-gcpercent-400)
+		lang=go args="--gcpercent=400" label="Go, GC percent 400"
+		issue=3 group=go-gcpercent go192=true ;;
+	go-gcpercent-1000)
+		lang=go args="--gcpercent=1000" label="Go, GC percent 1000"
+		issue=3 group=go-gcpercent go192=true ;;
+	# Step 2: a smaller cache. Below 2M the key space stays at 2.5M, so misses
+	# rise as the cache shrinks; above 2M it grows with the cache (keys
+	# default to capacity*5/4), so the hit rate stays at the baseline's.
+	go-cap-500K)
+		lang=go args="--capacity=500000 --keys=2500000" label="Go, 500K entries"
+		issue=3 group=go-capacity go192=true ;;
+	go-cap-1M)
+		lang=go args="--capacity=1000000 --keys=2500000" label="Go, 1M entries"
+		issue=3 group=go-capacity go192=true ;;
+	go-cap-4M)
+		lang=go args="--capacity=4000000" label="Go, 4M entries"
+		issue=3 group=go-capacity go192=true ;;
+	go-cap-8M)
+		lang=go args="--capacity=8000000" label="Go, 8M entries"
+		issue=3 group=go-capacity go192=true ;;
+	# Step 3: many partitioned caches, same total capacity.
+	go-shards-16)
+		lang=go args="--shards=16" label="Go, 16 shards"
+		issue=3 group=go-shards go192=true ;;
 	rust-baseline)
 		lang=rust label="Rust, HashMap + index list"
 		issue=2 group=rust ;;
