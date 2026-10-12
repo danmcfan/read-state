@@ -19,9 +19,9 @@ Running either program with no flags is this faithful workload: 20M entries, wri
 | Language | Files                                          | Cache structure                                       |
 | -------- | ---------------------------------------------- | ----------------------------------------------------- |
 | Go       | `main.go`, `cache_list.go`, `metrics.go`       | `map` + `container/list` doubly linked list           |
-| Rust     | `src/main.rs`                                  | `HashMap` + index-based doubly linked list in a `Vec` |
+| Rust     | `src/main.rs`, `src/cache.rs`                 | `HashMap` (or `BTreeMap` with `--map=btree`) + index-based doubly linked list in a `Vec` |
 
-The Rust cache reuses an evicted entry's slot for the new entry, so its backing array never grows past the capacity. Both caches preallocate their map for the full capacity.
+The Rust cache reuses an evicted entry's slot for the new entry, so its backing array never grows past the capacity. Both caches preallocate their map for the full capacity, except Rust's `BTreeMap`, which can't be preallocated.
 
 ## Requirements
 
@@ -64,6 +64,8 @@ Both programs take `--name=value`; Go also takes `-name=value` and Rust also tak
 | `--shards`     | Go       | `1`        | Split the cache into N independent LRU caches of `ceil(capacity/N)` entries, keys routed by hash |
 | `--gcpercent`  | Go       | `100`      | Set with `debug.SetGCPercent` at startup, so it overrides any `GOGC`; `-1` turns GC off |
 | `--gcperiod`   | Go       | `2m`       | Forced-GC period; any other value needs the `gcperiod` build (below)                  |
+| `--map`        | Rust     | `hash`     | Key index: `hash` (`HashMap`, preallocated) or `btree` (`BTreeMap`), as in Discord's change |
+| `--compact`    | Rust     | off        | `u32` links and map values instead of `Option<usize>`, shrinking an entry from 48 to 24 bytes; also `--compact=true\|false` |
 
 ### Forced-GC period
 

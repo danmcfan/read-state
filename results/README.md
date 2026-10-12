@@ -21,9 +21,9 @@ The cache fills in about 22 seconds, which leaves about 7 periodic collections i
 
 ### Go baseline vs Rust baseline (#2)
 
-On the same workload both do about 180,000 operations a second at an 80% hit rate. Rust averaged 5.5% of one core (max 10.2%) with no periodic spikes; Go averaged 12.0% but jumped to 29–44% in the second of each periodic GC, which marked about 195 MiB of live heap with 0.22–0.43 s of CPU every 20 s. (Go's numbers are from the #3 rerun of `go-baseline`; Rust's are from #2.)
+On the same workload both do about 180,000 operations a second at an 80% hit rate. Rust averaged 6.4% of one core (max 13.2%) with no periodic spikes; Go averaged 12.0% but jumped to 29–44% in the second of each periodic GC, which marked about 195 MiB of live heap with 0.22–0.43 s of CPU every 20 s. (Go's numbers are from the #3 rerun of `go-baseline`; Rust's are from the #4 rerun of `rust-baseline`.)
 
-Go used 256 MiB of RSS (134 bytes per entry, 56 of them the entry and its list element) against Rust's 160 MiB (84 bytes per entry, 48 of them the entry). Batch-latency tails were dominated by noise from other work on the host for both languages (see the caveats), so they don't yet separate the two.
+Go used 256 MiB of RSS (134 bytes per entry, 56 of them the entry and its list element) against Rust's 161 MiB (84 bytes per entry, 48 of them the entry). Batch-latency tails were dominated by noise from other work on the host for both languages (see the caveats), so they don't yet separate the two.
 
 ### Discord's tuning steps in Go (#3)
 
@@ -52,6 +52,38 @@ Each step of [Discord's post](https://discord.com/blog/why-discord-is-switching-
 
 **Step 3, 16 partitioned caches at the same total capacity: the same live heap, somewhat cheaper collections in this run.** The live heap (194 MiB), scannable heap (about 161 MiB) and object count are the same as the baseline's, every steady collection is still periodic, and neither run has meaningful assists (under 0.001 s per collection). Per periodic collection, though, `go-shards-16` spent 0.189 to 0.255 s of GC CPU (median 0.211 s), against 0.216 to 0.268 s (median 0.258 s, plus one 0.430 s outlier) for the baseline and medians of 0.246 to 0.256 s for the three GC percent runs, all from `summary.json`. That is 14 to 18% less than every other 2M list run, and its peak CPU was 37.4% against 43 to 46%. With the same pointers live, the mark work should be the same, so the cause is unexplained; a guess is that 16 maps and lists of 125,000 entries each are laid out more compactly, which makes marking faster. It is one run each, so #7's rerun of the whole matrix will recheck it. In the article, partitioning came together with a smaller cache per partition, and its effect there is step 2's.
 
+### Discord's Rust changes (#4)
+
+The post lists the changes Discord made after the straight port. Three of them change the cache, and each has a variant here:
+
+- "Changing to a BTreeMap instead of a HashMap in the LRU cache to optimize memory usage" is `--map=btree` (`rust-btree`).
+- "optimized the data structure to use even less memory (for fun)" is `--compact` (`rust-compact`): list links become `u32` with `u32::MAX` meaning none instead of `Option<usize>` (4 bytes instead of 16, since `usize` has no spare value for `None`), and map values become `u32`. One entry shrinks from 48 to 24 bytes. `rust-btree-compact` combines both.
+- "increased the cache capacity to 8 million Read States" is `rust-cap-4M`: twice the quick profile's capacity with the baseline structure, so size is the only change (keys grow to 5M, so the hit rate stays at 0.80). The faithful equivalent, 20M to 40M, wasn't run.
+
+The rest of Discord's list is out of scope: the metrics-library swap, "Reducing the number of memory copies" and the tokio upgrade concern the service's async runtime, concurrency and networking, and this single-threaded loop has none of them.
+
+All five runs, including a rerun of `rust-baseline`, come from one session at the same commit. Batch latency and CPU are over the steady window; batch percentiles are over every steady batch, not per second. Bytes per entry is median RSS divided by capacity.
+
+| Variant | Entry | RSS median (max) | Bytes per entry | Batch p50 / p99 / max | CPU mean (max) | Ops/s | Hit rate |
+| ------- | ----- | ---------------- | --------------- | --------------------- | -------------- | ----- | -------- |
+| `rust-baseline` (`HashMap`) | 48 B | 160.7 MiB (161.3) | 84 | 5.3 / 16.2 / 18.7 ms | 6.4% (13.2%) | 179,975 | 0.80 |
+| `rust-btree` | 48 B | 148.2 MiB (148.3) | 78 | 14.4 / 32.6 / 50.3 ms | 13.6% (23.8%) | 166,043 | 0.80 |
+| `rust-compact` | 24 B | 114.8 MiB (115.5) | 60 | 4.6 / 15.0 / 18.4 ms | 5.4% (12.3%) | 182,081 | 0.80 |
+| `rust-btree-compact` | 24 B | 93.2 MiB (93.3) | 49 | 20.7 / 27.8 / 32.0 ms | 16.0% (19.2%) | 160,688 | 0.80 |
+| `rust-cap-4M` (4M entries) | 48 B | 320.2 MiB (320.8) | 84 | 7.5 / 16.5 / 17.9 ms | 8.3% (12.6%) | 176,384 | 0.80 |
+
+**BTreeMap saved a little memory at this size, and cost more than twice the CPU.** At 2M entries `rust-btree` used 13.1 MB less RSS than `rust-baseline`, 6.5 bytes per entry or 7.8%, while its median batch took 2.7 times as long (14.4 ms against 5.3 ms) and it used 2.1 times the CPU (13.6% against 6.4% of a core).
+
+- The saving comes from `HashMap`'s slack, not from B-trees being small. `HashMap::with_capacity(2M)` rounds up to 2^22 buckets to stay under its 7/8 load factor, and each bucket costs 16 bytes plus a control byte, so the index is about 71 MB or 35.7 bytes per entry; with the 96 MB entry `Vec` that predicts 167 MB, close to the 168.5 MB measured. Taking away the same `Vec`, the `BTreeMap` index used about 29.7 bytes per entry (leaves of 11 keys that are about 2/3 to 3/4 full after random inserts and removes).
+- The conclusion holds at this size only. At the faithful 20M, 2^25 buckets are 28.5 bytes per entry, and the `HashMap` would probably use no more than the `BTreeMap`.
+- The cost is in batch time and CPU: a lookup walks 6 or 7 levels of nodes with a linear scan in each, instead of one hashed probe. Because the 100 ms sleep is fixed, longer batches also lower operations per second a little (166,043 against 179,975), but most of the cost shows in batch p50 and CPU, not in throughput.
+
+**Compact entries saved exactly the 24 bytes per entry.** `rust-compact` used 24.0 bytes per entry less than the baseline (84 to 60, 28.5% less RSS) and was no slower (batch p50 4.6 ms, CPU 5.4%). The map didn't shrink: `HashMap` stores `(i64, u32)` pairs, which pad to 16 bytes like `(i64, usize)`. `BTreeMap` does shrink, because a leaf keeps its keys and values in separate arrays: `rust-btree-compact` is 28.9 bytes per entry below `rust-btree`, the 24 from the entry plus about 5 from the `u32` values. That is the smallest variant (49 bytes per entry, 42% less RSS than the baseline), and 11.4 bytes per entry (19%) below `rust-compact`, but its median batch took 4.5 times as long as `rust-compact`'s (20.7 ms against 4.6 ms). Why it was slower than `rust-btree` is unexplained; it is one run each.
+
+**Twice the capacity doubled the memory and left the tail flat.** `rust-cap-4M` used 320.2 MiB, 1.99 times the baseline, at the same 84 bytes per entry. Its batch p99 and max (16.5 and 17.9 ms) match the baseline's, with no periodic spikes, since there is no collector. Its median batch rose from 5.3 to 7.5 ms and CPU from 6.4% to 8.3%, which is what a working set twice as large costs in CPU cache misses. Compare `go-cap-4M`, whose GC CPU per collection doubled with the cache: in Rust the bigger cache costs memory, not periodic work.
+
+These numbers are provisional: #7 reruns the whole matrix in one session and updates them.
+
 ## Caveats
 
 - **Periodic GCs aren't counted as forced.** `/gc/cycles/forced:gc-cycles` counts only `runtime.GC()` calls, so it stays at 0 even though Go's 2-minute (here 20 s) collection is called "forced" in `gctrace`. Each `gc` record's `kind` says what started it instead: `user` if the forced counter went up; otherwise `periodic` if GC is on and the cycle ended at least one forced-GC period after the previous cycle ended (the runtime's own trigger condition); otherwise `heap`. A group of cycles of different kinds is `mixed`. The time rule could call a slow heap-triggered cycle periodic, so check against the `GC forced` lines in the gctrace log (each one comes just before the `gc N` line it starts).
@@ -59,7 +91,7 @@ Each step of [Discord's post](https://discord.com/blog/why-discord-is-switching-
 - **Per-second p99 is close to max.** Each `sec` record covers only about 9 batches. Run-level percentiles in `summary.json` come from all the steady-state `batch_us` values.
 - **The `/cpu/classes/gc/...` values are the runtime's estimates.** Compare them with each other, not with `cpu_s`.
 - **macOS RSS leaves out compressed memory.** At quick-profile sizes on a 16 GB machine compression shouldn't kick in.
-- **The host wasn't idle.** The runs didn't overlap with each other or with builds, but other work on the machine (load average 7 to 15 on 10 cores) shared it. `cpu_pct` counts only the measured process's own CPU, but batch latency includes waiting for a core, so latency tails here are mostly host noise. The #3 runs had a quieter host (load average about 1.5 to 7), but other builds and browsers still shared it at times. The machine slept during the first `go-gcpercent-400` and `go-gcpercent-1000` runs, so those two were rerun with `caffeinate`, and no sleep overlapped the committed runs. The full matrix is rerun in one session later (#7).
+- **The host wasn't idle.** The runs didn't overlap with each other or with builds, but other work on the machine (load average 7 to 15 on 10 cores) shared it. `cpu_pct` counts only the measured process's own CPU, but batch latency includes waiting for a core, so latency tails here are mostly host noise. The #3 runs had a quieter host (load average about 1.5 to 7), but other builds and browsers still shared it at times. The #4 Rust runs ran back to back on a quiet host (load average about 1 to 3.5). The machine slept during the first `go-gcpercent-400` and `go-gcpercent-1000` runs, so those two were rerun with `caffeinate`, and no sleep overlapped the committed runs. The full matrix is rerun in one session later (#7).
 - **Go 1.9.2 wasn't run.** Discord ran Go 1.9.2. The optional Docker run of the baseline under `golang:1.9.2` from #3 was skipped. Which variants could have run there (`go192` in `summary.json`) comes from Go's documentation and release notes, not from a measurement. For #3's variants that rests on `debug.SetGCPercent` (Go 1.1), `container/list` and built-in maps all being in Go 1.9; the 16 shards are plain Go.
 
 ## File formats
