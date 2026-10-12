@@ -10,6 +10,9 @@ const (
 	Capacity        = 20_000_000
 	WriteCycleCount = 20_000
 	WriteInterval   = 100 * time.Millisecond
+	// Keys come from a range a little larger than the cache, so most writes update a
+	// cached entry (like Discord's read states) and only some evict.
+	KeySpace = Capacity * 5 / 4
 )
 
 type entry struct {
@@ -28,7 +31,7 @@ func main() {
 
 	for {
 		for range WriteCycleCount {
-			k := rand.Int63()
+			k := rand.Int63n(KeySpace)
 			v := rand.Int63()
 			cache.Put(k, v)
 		}

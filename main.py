@@ -5,6 +5,9 @@ from collections import OrderedDict
 CAPACITY = 20_000_000
 WRITE_CYCLE_COUNT = 20_000
 WRITE_INTERVAL = 0.1  # 100 milliseconds
+# Keys come from a range a little larger than the cache, so most writes update a
+# cached entry (like Discord's read states) and only some evict.
+KEY_SPACE = CAPACITY * 5 // 4
 
 
 class LRUCache:
@@ -31,7 +34,7 @@ def main():
 
     while True:
         for _ in range(WRITE_CYCLE_COUNT):
-            key = random.randint(0, 2**63 - 1)
+            key = random.randrange(KEY_SPACE)
             value = random.randint(0, 2**63 - 1)
             cache.put(key, value)
         time.sleep(WRITE_INTERVAL)

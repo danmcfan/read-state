@@ -6,6 +6,9 @@ import "core:time"
 CAPACITY :: 20_000_000
 WRITE_CYCLE_COUNT :: 20_000
 WRITE_INTERVAL :: 100 * time.Millisecond
+// Keys come from a range a little larger than the cache, so most writes update a
+// cached entry (like Discord's read states) and only some evict.
+KEY_SPACE :: CAPACITY * 5 / 4
 
 NO_INDEX :: -1
 
@@ -50,67 +53,64 @@ lru_put :: proc(c: ^LRU_Cache, key, value: i64) {
 		return
 	}
 
-	if len(c.lookup) >= c.capacity {
-		remove_tail(c)
-	}
-
-	index := len(c.entries)
 	entry := Entry {
 		key   = key,
 		value = value,
 		prev  = NO_INDEX,
-		next  = c.head,
+		next  = NO_INDEX,
 	}
-	if c.head != NO_INDEX {
-		c.entries[c.head].prev = index
+	index: int
+	if len(c.lookup) >= c.capacity {
+		// Reuse the evicted slot so entries never grows past capacity.
+		index = remove_tail(c)
+		c.entries[index] = entry
+	} else {
+		index = len(c.entries)
+		append(&c.entries, entry)
 	}
-	append(&c.entries, entry)
-	c.head = index
-	if c.tail == NO_INDEX {
-		c.tail = index
-	}
+	push_front(c, index)
 	c.lookup[key] = index
 }
 
 move_to_front :: proc(c: ^LRU_Cache, index: int) {
 	if c.head == index do return
 
-	entry := &c.entries[index]
-	prev, next := entry.prev, entry.next
+	unlink(c, index)
+	push_front(c, index)
+}
 
-	if prev != NO_INDEX {
-		c.entries[prev].next = next
-	}
-	if next != NO_INDEX {
-		c.entries[next].prev = prev
-	}
-	if c.tail == index {
-		c.tail = prev
-	}
-
-	entry.prev = NO_INDEX
-	entry.next = c.head
+push_front :: proc(c: ^LRU_Cache, index: int) {
+	c.entries[index].prev = NO_INDEX
+	c.entries[index].next = c.head
 	if c.head != NO_INDEX {
 		c.entries[c.head].prev = index
 	}
 	c.head = index
+	if c.tail == NO_INDEX {
+		c.tail = index
+	}
 }
 
-remove_tail :: proc(c: ^LRU_Cache) {
-	if c.tail == NO_INDEX do return
+unlink :: proc(c: ^LRU_Cache, index: int) {
+	prev, next := c.entries[index].prev, c.entries[index].next
 
-	tail := c.tail
-	entry := c.entries[tail]
-	prev := entry.prev
-
-	c.tail = prev
 	if prev != NO_INDEX {
-		c.entries[prev].next = NO_INDEX
+		c.entries[prev].next = next
 	} else {
-		c.head = NO_INDEX
+		c.head = next
 	}
+	if next != NO_INDEX {
+		c.entries[next].prev = prev
+	} else {
+		c.tail = prev
+	}
+}
 
-	delete_key(&c.lookup, entry.key)
+remove_tail :: proc(c: ^LRU_Cache) -> int {
+	tail := c.tail
+	unlink(c, tail)
+	delete_key(&c.lookup, c.entries[tail].key)
+	return tail
 }
 
 main :: proc() {
@@ -118,7 +118,7 @@ main :: proc() {
 
 	for {
 		for _ in 0 ..< WRITE_CYCLE_COUNT {
-			key := rand.int63()
+			key := rand.int63_max(KEY_SPACE)
 			value := rand.int63()
 			lru_put(&cache, key, value)
 		}
