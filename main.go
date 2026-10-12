@@ -30,6 +30,7 @@ type config struct {
 	variant   string
 	seed      uint64
 	layout    string
+	shards    int
 	gcpercent int
 	gcperiod  time.Duration
 }
@@ -49,6 +50,7 @@ func parseFlags(args []string, stderr io.Writer) (config, error) {
 	fs.StringVar(&c.variant, "variant", "", "variant name recorded in the config record")
 	fs.Uint64Var(&c.seed, "seed", 1, "random seed")
 	fs.StringVar(&c.layout, "layout", "list", "cache layout: list")
+	fs.IntVar(&c.shards, "shards", 1, "split the cache into this many independent LRU caches, routed by key hash")
 	fs.IntVar(&c.gcpercent, "gcpercent", 100, "GC percent, set with debug.SetGCPercent (overrides GOGC); -1 turns GC off")
 	fs.DurationVar(&c.gcperiod, "gcperiod", 2*time.Minute, "forced-GC period (needs the gcperiod build tag unless 2m)")
 	if err := fs.Parse(args); err != nil {
@@ -75,6 +77,12 @@ func parseFlags(args []string, stderr io.Writer) (config, error) {
 		return c, errors.New("--duration must not be negative")
 	case c.gcperiod <= 0:
 		return c, errors.New("--gcperiod must be positive")
+	case c.shards < 1:
+		return c, errors.New("--shards must be at least 1")
+	case c.shards > c.capacity:
+		return c, errors.New("--shards must not exceed --capacity")
+	case c.gcpercent < -1:
+		return c, errors.New("--gcpercent must be -1 or more")
 	case c.layout != "list":
 		return c, fmt.Errorf("unknown --layout %q (want list)", c.layout)
 	}
@@ -138,7 +146,11 @@ func main() {
 	}
 	debug.SetGCPercent(cfg.gcpercent)
 
-	cache := NewLRUCache(cfg.capacity)
+	cache, capacityEffective, err := newCache(cfg.layout, cfg.capacity, cfg.shards)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "read-state:", err)
+		os.Exit(2)
+	}
 	w := &workload{
 		cache:     cache,
 		rng:       rand.New(rand.NewPCG(cfg.seed, cfg.seed^0x9E3779B97F4A7C15)),
@@ -148,7 +160,7 @@ func main() {
 
 	var rec *recorder
 	if cfg.out != "" {
-		rec, err = newRecorder(cfg, start, listEntryBytes)
+		rec, err = newRecorder(cfg, start, listEntryBytes, capacityEffective)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "read-state:", err)
 			os.Exit(1)

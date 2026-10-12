@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -87,7 +89,7 @@ func TestSummarize(t *testing.T) {
 	if h.BatchP50US != 4 || h.BatchMaxUS != 100 || h.RSSBytesMedian != 2097152 || h.RSSBytesMax != 4194304 {
 		t.Errorf("headline batches/rss: %+v", h)
 	}
-	if h.GC == nil || h.GC.Cycles != 4 || h.GC.PeriodicCycles != 1 || h.GC.CPUSPerPeriodicMedian != 0.5 ||
+	if h.GC == nil || h.GC.Cycles != 4 || h.GC.PeriodicCycles != 1 || h.GC.CPUSPerPeriodicMedian == nil || *h.GC.CPUSPerPeriodicMedian != 0.5 ||
 		h.GC.PauseMaxMS != 0.5 || h.GC.HeapLiveBytes != 2097152 {
 		t.Errorf("gc headline: %+v", h.GC)
 	}
@@ -107,5 +109,54 @@ func TestSummarize(t *testing.T) {
 	}
 	if s.Profile.Capacity != 100 || s.Profile.GCPeriodS == nil || *s.Profile.GCPeriodS != 2 || s.Env.GitCommit != "abc" {
 		t.Errorf("profile/env: %+v %+v", s.Profile, s.Env)
+	}
+}
+
+// A run whose steady cycles are all heap-triggered has no per-periodic
+// values: they must be JSON null, not 0.
+func TestNoPeriodicCyclesIsNull(t *testing.T) {
+	body := strings.ReplaceAll(goRun, `"kind":"periodic"`, `"kind":"heap"`)
+	s := build([]*run{readFixture(t, "go-x", body)}, time.Unix(0, 0), io.Discard)
+	g := s.Variants[0].Headline.GC
+	if g.PeriodicCycles != 0 || g.Cycles != 4 {
+		t.Fatalf("gc headline: %+v", g)
+	}
+	b, err := json.Marshal(g)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range []string{"cpu_s_per_periodic_median", "cpu_s_per_periodic_max", "assist_s_per_periodic_median"} {
+		if !strings.Contains(string(b), `"`+f+`":null`) {
+			t.Errorf("%s isn't null in %s", f, b)
+		}
+	}
+}
+
+func TestMatrixOverridesRecordedOrder(t *testing.T) {
+	// go-x recorded order 1 when it was run; the current matrix puts it after rust-y.
+	p := filepath.Join(t.TempDir(), "matrix.jsonl")
+	rows := `{"variant":"rust-y","order":1,"label":"Rust Y","issue":2,"group":"rust","go192":null}
+{"variant":"go-x","order":2,"label":"Go X now","issue":3,"group":"go-baseline","go192":true}
+`
+	if err := os.WriteFile(p, []byte(rows), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	m, err := readMatrix(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runs := []*run{readFixture(t, "go-x", goRun), readFixture(t, "rust-y", rustShort)}
+	for _, r := range runs {
+		r.matrix = m[r.id]
+	}
+	s := build(runs, time.Unix(0, 0), io.Discard)
+	if s.Variants[0].ID != "rust-y" || s.Variants[1].ID != "go-x" {
+		t.Fatalf("variant order: %s, %s", s.Variants[0].ID, s.Variants[1].ID)
+	}
+	if g := s.Variants[1]; g.Label != "Go X now" || g.Issue == nil || *g.Issue != 3 {
+		t.Errorf("metadata not from the matrix: %+v", g)
+	}
+	if r := s.Variants[0]; r.Label != "Rust Y" || r.Go192 != nil {
+		t.Errorf("rust metadata: %+v", r)
 	}
 }

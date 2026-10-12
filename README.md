@@ -61,7 +61,8 @@ Both programs take `--name=value`; Go also takes `-name=value` and Rust also tak
 | `--variant`    | both     | (none)     | Name recorded in the metrics                                                          |
 | `--seed`       | both     | `1`        | Random seed                                                                           |
 | `--layout`     | Go       | `list`     | Cache layout (only `list` so far)                                                     |
-| `--gcpercent`  | Go       | `100`      | Set with `debug.SetGCPercent` at startup, so it overrides `GOGC`; `-1` turns GC off   |
+| `--shards`     | Go       | `1`        | Split the cache into N independent LRU caches of `ceil(capacity/N)` entries, keys routed by hash |
+| `--gcpercent`  | Go       | `100`      | Set with `debug.SetGCPercent` at startup, so it overrides any `GOGC`; `-1` turns GC off |
 | `--gcperiod`   | Go       | `2m`       | Forced-GC period; any other value needs the `gcperiod` build (below)                  |
 
 ### Forced-GC period

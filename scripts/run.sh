@@ -57,6 +57,35 @@ variant() {
 	go-baseline)
 		lang=go args="--layout=list" label="Go, map + container/list"
 		issue=2 group=go-baseline go192=true ;;
+	# Discord's step 1: GC percent (100 is go-baseline).
+	go-gcpercent-50)
+		lang=go args="--gcpercent=50" label="Go, GC percent 50"
+		issue=3 group=go-gcpercent go192=true ;;
+	go-gcpercent-400)
+		lang=go args="--gcpercent=400" label="Go, GC percent 400"
+		issue=3 group=go-gcpercent go192=true ;;
+	go-gcpercent-1000)
+		lang=go args="--gcpercent=1000" label="Go, GC percent 1000"
+		issue=3 group=go-gcpercent go192=true ;;
+	# Step 2: a smaller cache. Below 2M the key space stays at 2.5M, so misses
+	# rise as the cache shrinks; above 2M it grows with the cache (keys
+	# default to capacity*5/4), so the hit rate stays at the baseline's.
+	go-cap-500K)
+		lang=go args="--capacity=500000 --keys=2500000" label="Go, 500K entries"
+		issue=3 group=go-capacity go192=true ;;
+	go-cap-1M)
+		lang=go args="--capacity=1000000 --keys=2500000" label="Go, 1M entries"
+		issue=3 group=go-capacity go192=true ;;
+	go-cap-4M)
+		lang=go args="--capacity=4000000" label="Go, 4M entries"
+		issue=3 group=go-capacity go192=true ;;
+	go-cap-8M)
+		lang=go args="--capacity=8000000" label="Go, 8M entries"
+		issue=3 group=go-capacity go192=true ;;
+	# Step 3: many partitioned caches, same total capacity.
+	go-shards-16)
+		lang=go args="--shards=16" label="Go, 16 shards"
+		issue=3 group=go-shards go192=true ;;
 	rust-baseline)
 		lang=rust label="Rust, HashMap + index list"
 		issue=2 group=rust ;;
@@ -115,9 +144,29 @@ build() {
 	cargo build --release --quiet
 }
 
+# matrix_json ORDER prints the current variant's matrix metadata as a JSON
+# object (call variant NAME first).
+matrix_json() {
+	printf '{"order":%d,"label":%s,"issue":%d,"group":%s,"go192":%s}' \
+		"$1" "$(json_str "$label")" "$issue" "$(json_str "$group")" "$go192"
+}
+
+# summarize passes the current matrix to cmd/summarize, so the summary's order
+# and metadata follow this script even for results recorded before rows were
+# added or changed.
 summarize() {
 	echo "== summarize $OUT_DIR" >&2
-	go run ./cmd/summarize --in="$OUT_DIR"
+	matrix=$(mktemp "${TMPDIR:-/tmp}/read-state-matrix.XXXXXX")
+	i=0
+	for v in $(variants); do
+		i=$((i + 1))
+		variant "$v"
+		printf '{"variant":%s,%s\n' "$(json_str "$v")" "$(matrix_json "$i" | cut -c2-)"
+	done >"$matrix"
+	rc=0
+	go run ./cmd/summarize --in="$OUT_DIR" --matrix="$matrix" || rc=$?
+	rm -f "$matrix"
+	return "$rc"
 }
 
 # run_variant NAME ORDER runs one variant and writes $OUT_DIR/NAME.jsonl.
@@ -149,8 +198,7 @@ run_variant() {
 		printf '"go_version":%s,"rust_version":%s,"cargo_version":%s,' \
 			"$(json_str "$(go env GOVERSION)")" "$(json_str "$(rustc --version)")" \
 			"$(json_str "$(cargo --version)")"
-		printf '"matrix":{"order":%d,"label":%s,"issue":%d,"group":%s,"go192":%s}}\n' \
-			"$order" "$(json_str "$label")" "$issue" "$(json_str "$group")" "$go192"
+		printf '"matrix":%s}\n' "$(matrix_json "$order")"
 	} >"$out"
 
 	echo "== $v: $cmd" >&2

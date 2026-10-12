@@ -88,11 +88,12 @@ type host struct {
 }
 
 type matrix struct {
-	Order int    `json:"order"`
-	Label string `json:"label"`
-	Issue int    `json:"issue"`
-	Group string `json:"group"`
-	Go192 *bool  `json:"go192"`
+	Variant string `json:"variant,omitempty"` // only in a --matrix file
+	Order   int    `json:"order"`
+	Label   string `json:"label"`
+	Issue   int    `json:"issue"`
+	Group   string `json:"group"`
+	Go192   *bool  `json:"go192"`
 }
 
 // run is one variant's parsed file.
@@ -103,6 +104,21 @@ type run struct {
 	secs   []record
 	gcs    []record
 	procs  []record
+	// matrix is the variant's row in the current matrix (--matrix), which
+	// overrides the one env recorded when the variant was run.
+	matrix *matrix
+}
+
+// meta returns the variant's matrix metadata: the current matrix row if
+// there is one, else what env recorded at run time, else nil.
+func (r *run) meta() *matrix {
+	if r.matrix != nil {
+		return r.matrix
+	}
+	if r.env != nil {
+		return r.env.Matrix
+	}
+	return nil
 }
 
 func readRun(path string) (*run, error) {
@@ -229,14 +245,14 @@ type headline struct {
 }
 
 type gcHeadline struct {
-	Cycles                   int64   `json:"cycles"`
-	PeriodicCycles           int64   `json:"periodic_cycles"`
-	CPUSPerPeriodicMedian    float64 `json:"cpu_s_per_periodic_median"`
-	CPUSPerPeriodicMax       float64 `json:"cpu_s_per_periodic_max"`
-	AssistSPerPeriodicMedian float64 `json:"assist_s_per_periodic_median"`
-	PauseMaxMS               float64 `json:"pause_max_ms"`
-	ScanHeapBytes            int64   `json:"scan_heap_bytes"`
-	HeapLiveBytes            int64   `json:"heap_live_bytes"`
+	Cycles                   int64    `json:"cycles"`
+	PeriodicCycles           int64    `json:"periodic_cycles"`
+	CPUSPerPeriodicMedian    *float64 `json:"cpu_s_per_periodic_median"`
+	CPUSPerPeriodicMax       *float64 `json:"cpu_s_per_periodic_max"`
+	AssistSPerPeriodicMedian *float64 `json:"assist_s_per_periodic_median"`
+	PauseMaxMS               float64  `json:"pause_max_ms"`
+	ScanHeapBytes            int64    `json:"scan_heap_bytes"`
+	HeapLiveBytes            int64    `json:"heap_live_bytes"`
 }
 
 type series struct {
@@ -273,6 +289,8 @@ func percentile[T int64 | float64](sorted []T, p float64) T {
 	return sorted[max(0, min(i, len(sorted)-1))]
 }
 
+func ptr[T any](v T) *T { return &v }
+
 func median[T int64 | float64](v []T) T {
 	s := slices.Clone(v)
 	slices.Sort(s)
@@ -305,8 +323,7 @@ func nearestProc(procs []record, t float64) (int64, bool) {
 func summarizeRun(r *run, stderr io.Writer) variant {
 	c := r.config
 	v := variant{ID: r.id, Lang: c.Lang, GCEvents: []gcEvent{}}
-	if r.env != nil && r.env.Matrix != nil {
-		m := r.env.Matrix
+	if m := r.meta(); m != nil {
 		v.Label, v.Group, v.Go192 = m.Label, m.Group, m.Go192
 		v.Issue = &m.Issue
 	}
@@ -452,10 +469,14 @@ func computeHeadline(r *run, si int, capacity int64, isGo bool) *headline {
 			g.PauseMaxMS = max(g.PauseMaxMS, round(e.PauseS*1000, 3))
 		}
 	}
-	slices.Sort(periodicCPU)
-	g.CPUSPerPeriodicMedian = round(percentile(periodicCPU, 0.5), 3)
-	g.CPUSPerPeriodicMax = round(percentile(periodicCPU, 1), 3)
-	g.AssistSPerPeriodicMedian = round(median(periodicAssist), 3)
+	// With no single-cycle periodic records (for example when heap-triggered
+	// cycles always come before the period runs out) these stay null.
+	if len(periodicCPU) > 0 {
+		slices.Sort(periodicCPU)
+		g.CPUSPerPeriodicMedian = ptr(round(percentile(periodicCPU, 0.5), 3))
+		g.CPUSPerPeriodicMax = ptr(round(percentile(periodicCPU, 1), 3))
+		g.AssistSPerPeriodicMedian = ptr(round(median(periodicAssist), 3))
+	}
 	if len(scanHeap) > 0 {
 		g.ScanHeapBytes = median(scanHeap)
 	}
@@ -467,8 +488,8 @@ func computeHeadline(r *run, si int, capacity int64, isGo bool) *headline {
 }
 
 func order(r *run) int {
-	if r.env != nil && r.env.Matrix != nil && r.env.Matrix.Order > 0 {
-		return r.env.Matrix.Order
+	if m := r.meta(); m != nil && m.Order > 0 {
+		return m.Order
 	}
 	return math.MaxInt
 }
@@ -520,8 +541,31 @@ func build(runs []*run, now time.Time, stderr io.Writer) summary {
 	return out
 }
 
+// readMatrix reads a --matrix file: one JSON object per line with the
+// variant's name and its current order, label, issue, group and go192, as
+// scripts/run.sh prints them.
+func readMatrix(path string) (map[string]*matrix, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]*matrix{}
+	for i, line := range bytes.Split(b, []byte("\n")) {
+		if len(bytes.TrimSpace(line)) == 0 {
+			continue
+		}
+		m := &matrix{}
+		if err := json.Unmarshal(line, m); err != nil || m.Variant == "" {
+			return nil, fmt.Errorf("%s:%d: bad matrix row: %q", path, i+1, line)
+		}
+		out[m.Variant] = m
+	}
+	return out, nil
+}
+
 func main() {
 	in := flag.String("in", "results", "directory of <variant>.jsonl files")
+	matrixPath := flag.String("matrix", "", "JSONL of the current matrix rows; overrides the order and metadata recorded at run time")
 	flag.Parse()
 
 	paths, err := filepath.Glob(filepath.Join(*in, "*.jsonl"))
@@ -537,6 +581,20 @@ func main() {
 			os.Exit(1)
 		}
 		runs = append(runs, r)
+	}
+	if *matrixPath != "" {
+		m, err := readMatrix(*matrixPath)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "summarize:", err)
+			os.Exit(1)
+		}
+		for _, r := range runs {
+			if row, ok := m[r.id]; ok {
+				r.matrix = row
+			} else {
+				fmt.Fprintf(os.Stderr, "summarize: warning: %s is not in the current matrix\n", r.id)
+			}
+		}
 	}
 	b, err := json.MarshalIndent(build(runs, time.Now(), os.Stderr), "", " ")
 	if err != nil {
