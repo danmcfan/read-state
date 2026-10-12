@@ -26,7 +26,7 @@ The Rust cache reuses an evicted entry's slot for the new entry, so its backing 
 - Go 1.22 or newer
 - Rust (stable toolchain with `cargo`)
 
-Each program uses about 1.5 to 2 GB of RAM once the cache is full, so run one at a time on smaller machines.
+Once the cache is full, Rust uses about 1.5 GB of RAM and Go uses 2 GB or more, so run one at a time on smaller machines.
 
 ## Running
 
