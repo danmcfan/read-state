@@ -159,6 +159,11 @@
     details summary { cursor: pointer; }
     details .scroll { max-height: 260px; overflow: auto; }
 
+    .live-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 10px; font-size: .85rem; color: var(--muted); }
+    .live-bar .copy { min-width: 76px; }
+    .live-bar .stats { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .plot .gc line { stroke: var(--go); stroke-dasharray: 3 4; }
+
     footer { margin-top: 56px; color: var(--muted); font-size: 0.9rem; }
     @media (max-width: 560px) {
       .cards { grid-template-columns: 1fr; }
@@ -216,6 +221,15 @@
       </div>
     </div>
     <p>Discord reported that even with only basic optimization, the Rust port outperformed the hand-tuned Go service, and after some profiling it beat Go on latency, CPU, and memory. Without a GC cost, they could also raise the cache capacity to 8 million read states, which cut database reads further. Along the way they swapped the cache's <code>HashMap</code> for a <code>BTreeMap</code> to save memory.</p>
+
+    <h2 id="live"><a class="anchor" href="#live" aria-label="Link to this section">#</a>Watch it live</h2>
+    <p>The same cache, compiled to WebAssembly, can run right here in your browser. Press Start to run the <span class="go">Go</span> and <span class="rust">Rust</span> builds side by side, each in its own worker. Every point is one batch of 20,000 writes to a cache of 2,000,000 entries; dashed lines mark Go garbage collections.</p>
+    <figure class="chart" id="live-chart">
+      <div class="head"><span class="title">Latency per batch, last 30 seconds</span><span class="legend"><span><i style="background:var(--go-fill)"></i>Go</span><span><i style="background:var(--rust-fill)"></i>Rust</span></span></div>
+      <div class="plot"><svg viewBox="0 0 680 250" role="img" aria-label="Live per-batch latency for Go and Rust"><g class="grid"></g><g class="gc"></g><polyline class="go-line" fill="none" stroke-width="2" stroke-linejoin="round" stroke="var(--go-fill)"/><polyline class="rust-line" fill="none" stroke-width="2" stroke-linejoin="round" stroke="var(--rust-fill)"/></svg></div>
+      <div class="live-bar"><button class="copy" type="button" id="live-toggle">Start</button><span class="stats" aria-live="polite">Not running. Uses two CPU cores while running.</span></div>
+      <figcaption>Browser WASM is slower than native code, and Go's WASM build runs its collector on a single thread, so the numbers differ from Discord's servers. The shape is what matters: watch for Go's spikes when a collection runs.</figcaption>
+    </figure>
 
     <h2 id="demo"><a class="anchor" href="#demo" aria-label="Link to this section">#</a>The demo in this repo</h2>
     <p>This repository reproduces the shape of that workload so you can watch the difference yourself. Each program runs a single-threaded LRU cache with a capacity of 20,000,000 entries, writes 20,000 random key/value pairs, sleeps 100ms, and repeats forever.</p>
@@ -291,6 +305,71 @@
       });
       hit.addEventListener('pointerleave', function () { tip.hidden = true; xh.setAttribute('visibility', 'hidden'); });
     })();
+  </script>
+  <script type="module">
+    import { Window, niceMax, polyline } from './live.mjs';
+
+    const fig = document.getElementById('live-chart');
+    const svg = fig.querySelector('svg'), btn = document.getElementById('live-toggle'), stats = fig.querySelector('.stats');
+    const NS = 'http://www.w3.org/2000/svg', SPAN = 30000;
+    const box = { left: 44, top: 22, width: 624, height: 200 };
+    let workers = [], series, frame = 0;
+
+    const el = (name, attrs, text) => {
+      const e = document.createElementNS(NS, name);
+      for (const k in attrs) e.setAttribute(k, attrs[k]);
+      if (text) e.textContent = text;
+      return e;
+    };
+    const fmt = (v) => v && v < 10 ? v.toFixed(1) : Math.round(v);
+
+    function draw() {
+      frame = 0;
+      const end = Math.max(series.go.end, series.rust.end), t0 = end - SPAN;
+      const yMax = niceMax(Math.max(series.go.max(), series.rust.max()));
+      const grid = svg.querySelector('.grid'), gc = svg.querySelector('.gc');
+      grid.replaceChildren();
+      for (let i = 0; i <= 2; i++) {
+        const y = box.top + box.height * (1 - i / 2);
+        grid.append(el('line', { x1: box.left, x2: box.left + box.width, y1: y, y2: y, stroke: 'var(--border)' }),
+          el('text', { x: box.left - 8, y: y + 4, 'text-anchor': 'end' }, fmt(yMax * i / 2) + ' ms'));
+      }
+      gc.replaceChildren();
+      for (const s of series.go.samples) if (s.gc && s.t >= t0) {
+        const x = box.left + (s.t - t0) / SPAN * box.width;
+        gc.append(el('line', { x1: x, x2: x, y1: box.top - 4, y2: box.top + box.height }));
+      }
+      svg.querySelector('.go-line').setAttribute('points', polyline(series.go.samples, t0, end, yMax, box));
+      svg.querySelector('.rust-line').setAttribute('points', polyline(series.rust.samples, t0, end, yMax, box));
+      const last = (w) => w.samples.length ? fmt(w.samples.at(-1).ms) + ' ms' : 'loading';
+      const gcs = series.go.samples.reduce((n, s) => n + (s.gc ? s.gc.count : 0), 0);
+      stats.textContent = `Go ${last(series.go)} · Rust ${last(series.rust)} · ${gcs} Go GCs in view`;
+    }
+
+    function start() {
+      series = { go: new Window(SPAN), rust: new Window(SPAN) };
+      workers = ['go', 'rust'].map((lang) => {
+        const w = new Worker(new URL('./worker.mjs', import.meta.url), { type: 'module' });
+        w.onmessage = ({ data }) => {
+          if (data.error) { stats.textContent = `${lang} failed to start: ${data.error}`; stop(); return; }
+          if (data.ready) return;
+          series[lang].push(data);
+          frame ||= requestAnimationFrame(draw);
+        };
+        w.postMessage({ lang, capacity: 2_000_000, batch: 20_000 });
+        return w;
+      });
+      btn.textContent = 'Stop';
+      stats.textContent = 'Loading and filling both caches...';
+    }
+
+    function stop() {
+      workers.forEach((w) => w.terminate());
+      workers = [];
+      btn.textContent = 'Start';
+    }
+
+    btn.addEventListener('click', () => workers.length ? stop() : start());
   </script>
 </body>
 </html>
