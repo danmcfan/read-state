@@ -5,6 +5,7 @@
 package main
 
 import (
+	"math"
 	"runtime"
 	"syscall/js"
 	"time"
@@ -22,8 +23,12 @@ func main() {
 			w = readstate.NewWorkload(args[0].Int())
 			return nil
 		}),
-		// runBatch(n) -> elapsed milliseconds.
+		// runBatch(n) -> elapsed milliseconds, or NaN before init. A panic
+		// here would kill the Go runtime for good.
 		"runBatch": js.FuncOf(func(_ js.Value, args []js.Value) any {
+			if w == nil {
+				return math.NaN()
+			}
 			start := time.Now()
 			w.Run(args[0].Int())
 			return float64(time.Since(start).Nanoseconds()) / 1e6

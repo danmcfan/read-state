@@ -9,7 +9,8 @@ export function init(capacity) {
 }
 
 /**
- * Runs `n` operations and returns the elapsed milliseconds.
+ * Runs `n` operations and returns the elapsed milliseconds, or NaN before
+ * `init`.
  * @param {number} n
  * @returns {number}
  */

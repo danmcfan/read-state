@@ -7,7 +7,8 @@
 export function init(capacity: number): void;
 
 /**
- * Runs `n` operations and returns the elapsed milliseconds.
+ * Runs `n` operations and returns the elapsed milliseconds, or NaN before
+ * `init`.
  */
 export function runBatch(n: number): number;
 

@@ -26,7 +26,7 @@ Both caches also run in the browser, driven by the same workload (`workload.go`,
 | Go    | `cmd/wasm`     | `site/wasm/go`   | `wasm_exec.js` + `readstate.wasm`, then the `readStateGo` global |
 | Rust  | `src/wasm.rs`  | `site/wasm/rust` | ES module `read_state.js` (wasm-pack, `--target web`) |
 
-Both expose `init(capacity)`, which builds a fresh, pre-filled cache, and `runBatch(n)`, which runs `n` operations and returns the elapsed milliseconds. The Go build also exposes `forceGC()` and `heapStats()`, which returns `{ heapAlloc, numGC, lastPauseMs }`.
+Both expose `init(capacity)`, which builds a fresh, pre-filled cache, and `runBatch(n)`, which runs `n` operations and returns the elapsed milliseconds (NaN before `init`). The Go build also exposes `forceGC()` and `heapStats()`, which returns `{ heapAlloc, numGC, lastPauseMs }`.
 
 The built files are committed. After changing either cache or workload, rebuild them all with:
 

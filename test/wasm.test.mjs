@@ -26,6 +26,10 @@ for (const [name, load] of [["go", loadGo], ["rust", loadRust]]) {
   test(`${name}: init and runBatch`, async (t) => {
     const m = await load();
 
+    await t.test("runBatch before init returns NaN", () => {
+      assert.ok(Number.isNaN(m.runBatch(10)));
+    });
+
     await t.test("runBatch returns finite positive ms", () => {
       m.init(100_000);
       const ms = m.runBatch(20_000);

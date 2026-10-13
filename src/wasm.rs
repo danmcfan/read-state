@@ -26,12 +26,15 @@ pub fn init(capacity: usize) {
     });
 }
 
-/// Runs `n` operations and returns the elapsed milliseconds.
+/// Runs `n` operations and returns the elapsed milliseconds, or NaN before
+/// `init`.
 #[wasm_bindgen(js_name = runBatch)]
 pub fn run_batch(n: u32) -> f64 {
     WORKLOAD.with(|w| {
         let mut w = w.borrow_mut();
-        let w = w.as_mut().expect("init must be called before runBatch");
+        let Some(w) = w.as_mut() else {
+            return f64::NAN;
+        };
         let start = now();
         w.run(n);
         now() - start
