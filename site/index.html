@@ -6,7 +6,7 @@
     <title>Read State: Go to Rust</title>
     <meta
       name="description"
-      content="How Discord rewrote its Read States service from Go to Rust, and a small demo that reproduces the workload."
+      content="How Discord rewrote its Read States service from Go to Rust, and live Go and Rust WebAssembly builds of its cache."
     />
     <link rel="canonical" href="https://read-state.dannyobrien.dev/" />
     <link
@@ -17,7 +17,7 @@
     <meta property="og:title" content="Why Discord moved Read States from Go to Rust" />
     <meta
       property="og:description"
-      content="A short explainer of Discord's 2020 rewrite, plus a demo that reproduces the workload in Go and Rust."
+      content="A short explainer of Discord's 2020 rewrite, plus the same cache running live in Go and Rust."
     />
     <meta property="og:url" content="https://read-state.dannyobrien.dev/" />
     <meta property="og:image" content="https://read-state.dannyobrien.dev/og.png" />
@@ -38,7 +38,8 @@
     <main>
       <h1>Why Discord moved Read States from <span class="go">Go</span> to <span class="rust">Rust</span></h1>
       <p class="lede">
-        A short explainer of Discord's 2020 rewrite, plus a small demo that reproduces the workload in Go and Rust.
+        A short explainer of Discord's 2020 rewrite, plus the same cache running live in your browser, built from Go and
+        from Rust.
       </p>
       <p class="links">
         <a href="https://github.com/danmcfan/read-state">Source on GitHub</a
@@ -116,7 +117,7 @@
 
       <figure class="chart">
         <div class="head">
-          <span class="title">CPU while the demo runs</span
+          <span class="title">CPU in an earlier native run</span
           ><span class="legend"
             ><span><i style="background: var(--go-fill)"></i>Go</span
             ><span><i style="background: var(--rust-fill)"></i>Rust</span></span
@@ -188,9 +189,11 @@
         </div>
         <div id="live-chart"></div>
         <figcaption>
-          Browser WASM is slower than native code, and Go's WASM build runs its collector on a single thread, so the
-          numbers differ from Discord's servers. The shape is what matters: watch for Go's spikes when a collection
-          runs.
+          Browser WASM is slower than native code, so the numbers differ from Discord's servers. Go's WASM runtime is
+          also different from native Go in two ways. It is single-threaded, so each collection pauses the whole program
+          instead of running beside it on other cores. And it has no background monitor thread, so the two-minute forced
+          GC never fires: every collection here is triggered by heap growth. The shape is what matters: watch for Go's
+          spikes when a collection runs.
         </figcaption>
       </figure>
 
@@ -198,9 +201,7 @@
       <p>
         Both caches live in this repository: <code>cache_list.go</code> (a <code>map</code> plus
         <code>container/list</code>) and <code>src/lib.rs</code> (a <code>HashMap</code> plus an index-based linked
-        list). The page above runs them as WebAssembly. Note that Go's WASM runtime is single-threaded, so its collector
-        pauses the whole program instead of running beside it on other cores as native Go does; the spikes here are a
-        stand-in for Discord's, not a copy.
+        list). The live chart above runs them as WebAssembly.
       </p>
       <div class="cmds">
         <div class="cmd">

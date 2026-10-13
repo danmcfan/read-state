@@ -16,6 +16,11 @@ async function inOrder<T>(items: readonly T[], step: (item: T) => Promise<void>)
 
 const writeButton = "#lru-diagram .live-bar button:first-child";
 
+/** `n` presses, as items for `inOrder`. */
+function presses(n: number): number[] {
+  return Array.from({ length: n }, (_, i) => i);
+}
+
 await verify("diagrams", async (v) => {
   await v.open("/", "light");
   const svgs = await v.eval(
@@ -26,14 +31,14 @@ await verify("diagrams", async (v) => {
   v.check(spikes === 3, "the GC timeline marks three forced GCs", spikes);
 
   v.check((await v.eval(slots)) === '["","","","",""]', "the LRU cache starts empty", await v.eval(slots));
-  await inOrder(["a", "b", "c"], async () => {
+  await inOrder(presses(3), async () => {
     await v.click(writeButton);
   });
   v.check((await v.eval(slots)) === '["c","b","a","",""]', "new keys go in front", await v.eval(slots));
   await v.click(writeButton);
   v.check((await v.eval(slots)) === '["a","c","b","",""]', "a hit moves the key to the front", await v.eval(slots));
   v.check(String(await v.eval(status)).includes("already cached"), "the status explains the hit", await v.eval(status));
-  await inOrder(["d", "e", "b", "f"], async () => {
+  await inOrder(presses(4), async () => {
     await v.click(writeButton);
   });
   const evicted = await v.eval("document.querySelector('#lru-diagram .slot.evicted')?.textContent");
@@ -44,7 +49,10 @@ await verify("diagrams", async (v) => {
     await v.screenshot(`${id}-light`, `#${id}`);
   });
   await v.open("/", "dark");
-  await inOrder(["read-states-diagram", "gc-diagram", "rewrite-diagram"], async (id) => {
+  await inOrder(presses(8), async () => {
+    await v.click(writeButton);
+  });
+  await inOrder(["read-states-diagram", "lru-diagram", "gc-diagram", "rewrite-diagram"], async (id) => {
     await v.screenshot(`${id}-dark`, `#${id}`);
   });
   await v.assertNoErrors();

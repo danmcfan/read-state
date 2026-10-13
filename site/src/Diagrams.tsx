@@ -166,7 +166,7 @@ export function GcTimelineDiagram(): JSX.Element {
         )}
       </For>
       <polyline class="series" stroke="var(--go-fill)" points={go()} />
-      <polyline class="series" stroke="var(--rust-fill)" points={`${String(x(0))},160 ${String(x(8))},160`} />
+      <polyline class="series" stroke="var(--rust-fill)" points={`${String(x(0))},154 ${String(x(8))},154`} />
     </svg>
   );
 }
