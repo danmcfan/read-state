@@ -1,0 +1,15 @@
+version: "2"
+linters:
+  enable:
+    - errorlint
+    - gocritic
+    - revive
+    - unconvert
+    - unparam
+formatters:
+  enable:
+    - gofumpt
+  settings:
+    gofumpt:
+      # The module path has no dot, so gofumpt would group it with the standard library.
+      module-path: readstate

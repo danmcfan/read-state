@@ -19,5 +19,13 @@ ts=$(echo "$files" | grep -E '\.tsx?$' || true)
 if [ -n "$ts" ]; then
   echo "$ts" | xargs bunx oxlint --type-aware --fix --deny-warnings --report-unused-disable-directives
 fi
+go=$(echo "$files" | grep -E '\.go$' || true)
+if [ -n "$go" ]; then
+  echo "$go" | xargs golangci-lint fmt
+fi
+rs=$(echo "$files" | grep -E '\.rs$' || true)
+if [ -n "$rs" ]; then
+  echo "$rs" | xargs rustfmt --edition 2021
+fi
 bun scripts/lint-guards.ts
 echo "$files" | xargs git add
