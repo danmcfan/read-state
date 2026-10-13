@@ -6,6 +6,17 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# Fail before touching the output when a tool is missing, naming the install.
+missing=()
+command -v go >/dev/null || missing+=("go: https://go.dev/dl/")
+command -v wasm-pack >/dev/null || missing+=("wasm-pack: cargo install wasm-pack")
+rustup target list --installed 2>/dev/null | grep -qx wasm32-unknown-unknown ||
+  missing+=("wasm32 target: rustup target add wasm32-unknown-unknown")
+if ((${#missing[@]})); then
+  printf 'build-wasm: missing %s\n' "${missing[@]}" >&2
+  exit 1
+fi
+
 out=site/public/wasm
 rm -rf "$out/go" "$out/rust"
 mkdir -p "$out/go"
