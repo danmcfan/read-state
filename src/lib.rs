@@ -12,9 +12,9 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-pub mod workload;
 #[cfg(target_arch = "wasm32")]
 mod wasm;
+pub mod workload;
 
 /// A link between entries: a slot index or none.
 pub trait Link: Copy + PartialEq {
@@ -39,8 +39,7 @@ impl Link for u32 {
     const NONE: Self = u32::MAX;
     #[inline]
     fn from_idx(i: usize) -> Self {
-        debug_assert!(i < u32::MAX as usize);
-        i as u32
+        u32::try_from(i).expect("index fits in a u32 link")
     }
     #[inline]
     fn idx(self) -> Option<usize> {
@@ -53,6 +52,7 @@ impl Link for u32 {
 }
 
 /// The largest capacity a link type can address.
+#[must_use]
 pub fn max_capacity<L: Link>() -> usize {
     if std::mem::size_of::<L>() == 4 {
         u32::MAX as usize
@@ -70,6 +70,9 @@ pub trait KeyIndex {
     fn insert(&mut self, k: i64, i: usize);
     fn remove(&mut self, k: i64);
     fn len(&self) -> usize;
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 macro_rules! key_index {
@@ -85,7 +88,11 @@ macro_rules! key_index {
             }
             #[inline]
             fn insert(&mut self, k: i64, i: usize) {
-                $map::insert(self, k, i as $v);
+                $map::insert(
+                    self,
+                    k,
+                    <$v>::try_from(i).expect("index fits the key index value"),
+                );
             }
             #[inline]
             fn remove(&mut self, k: i64) {
@@ -116,6 +123,9 @@ pub trait Cache {
     /// key is updated and moved to the front.
     fn put(&mut self, key: i64, value: i64) -> (bool, bool);
     fn len(&self) -> usize;
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 pub struct Entry<L> {
@@ -140,8 +150,15 @@ pub type BTreeWide = LruCache<BTreeMap<i64, usize>, Option<usize>>;
 pub type BTreeCompact = LruCache<BTreeMap<i64, u32>, u32>;
 
 impl<M: KeyIndex, L: Link> LruCache<M, L> {
+    /// # Panics
+    ///
+    /// If `capacity` is more than the link type can address.
+    #[must_use]
     pub fn new(capacity: usize) -> Self {
-        assert!(capacity <= max_capacity::<L>(), "capacity too large for the link type");
+        assert!(
+            capacity <= max_capacity::<L>(),
+            "capacity too large for the link type"
+        );
         LruCache {
             capacity,
             map: M::with_capacity(capacity),
@@ -336,7 +353,7 @@ mod tests {
             x ^= x << 13;
             x ^= x >> 7;
             x ^= x << 17;
-            let k = (x % 150) as i64;
+            let k = (x % 150).cast_signed();
             if i % 2 == 0 {
                 c.get(k);
             } else {
@@ -371,6 +388,9 @@ mod tests {
         assert_eq!((BTreeWide::MAP, BTreeWide::COMPACT), ("btree", false));
         assert_eq!((BTreeCompact::MAP, BTreeCompact::COMPACT), ("btree", true));
         // A u32 value doesn't shrink a HashMap slot: (i64, u32) pads to 16.
-        assert_eq!(std::mem::size_of::<(i64, u32)>(), std::mem::size_of::<(i64, usize)>());
+        assert_eq!(
+            std::mem::size_of::<(i64, u32)>(),
+            std::mem::size_of::<(i64, usize)>()
+        );
     }
 }

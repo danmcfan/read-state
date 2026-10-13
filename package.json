@@ -10,6 +10,7 @@
     "build:wasm": "scripts/build-wasm.sh",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint --type-aware --deny-warnings --report-unused-disable-directives && bun scripts/lint-guards.ts",
+    "lint:native": "golangci-lint run ./... && GOOS=js GOARCH=wasm golangci-lint run ./cmd/... && cargo fmt --check && cargo clippy --all-targets --quiet -- -D warnings",
     "lint:fix": "oxlint --type-aware --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -17,7 +18,7 @@
     "test": "bun test",
     "test:native": "go vet ./... && go test ./... && cargo test --quiet",
     "verify": "bun scripts/verify.ts",
-    "check": "bun run typecheck && bun run lint && bun run format:check && bun run knip && bun test && bun run build && bun run test:native"
+    "check": "bun run typecheck && bun run lint && bun run format:check && bun run lint:native && bun run knip && bun test && bun run build && bun run test:native"
   },
   "dependencies": {
     "solid-js": "1.9.17"
