@@ -441,3 +441,112 @@ footer {
     transform: none;
   }
 }
+
+figure.diagram svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 8px;
+}
+figure.diagram text {
+  font:
+    12px system-ui,
+    sans-serif;
+  fill: var(--fg);
+}
+figure.diagram text.small {
+  font-size: 11px;
+  fill: var(--muted);
+}
+figure.diagram text.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+figure.diagram text.strong {
+  font-weight: 600;
+}
+figure.diagram text.go-text {
+  fill: var(--go);
+}
+figure.diagram text.rust-text {
+  fill: var(--rust);
+}
+figure.diagram .box {
+  fill: var(--code-bg);
+  stroke: var(--border);
+}
+figure.diagram .box.accent {
+  fill: var(--card);
+  stroke: var(--muted);
+}
+figure.diagram .box.scanned {
+  fill: var(--go-tint);
+  stroke: var(--go-fill);
+}
+figure.diagram .box.owned {
+  fill: var(--rust-tint);
+  stroke: color-mix(in srgb, var(--rust-fill) 45%, transparent);
+}
+figure.diagram .box.freed {
+  fill: none;
+  stroke: var(--rust-fill);
+  stroke-dasharray: 3 3;
+}
+figure.diagram .arrow,
+figure.diagram .axis {
+  stroke: var(--muted);
+}
+figure.diagram .head {
+  fill: var(--muted);
+}
+figure.diagram .gc-mark {
+  stroke: var(--muted);
+  stroke-dasharray: 3 4;
+}
+figure.diagram .series {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.lru-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.lru-end {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.slot {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--code-bg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 600;
+}
+.slot.empty {
+  border-style: dashed;
+}
+.slot.fresh {
+  border-color: var(--go-fill);
+  background: var(--go-tint);
+}
+.slot.evicted {
+  margin-left: 8px;
+  color: var(--rust);
+  border: 1px dashed var(--rust-fill);
+  background: none;
+  text-decoration: line-through;
+}
+.lru-status {
+  min-width: 0;
+}
+.copy:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

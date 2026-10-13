@@ -6,7 +6,7 @@
     <title>Read State: Go to Rust</title>
     <meta
       name="description"
-      content="How Discord rewrote its Read States service from Go to Rust, and a small demo that reproduces the workload."
+      content="How Discord rewrote its Read States service from Go to Rust, and live Go and Rust WebAssembly builds of its cache."
     />
     <link rel="canonical" href="https://read-state.dannyobrien.dev/" />
     <link
@@ -17,7 +17,7 @@
     <meta property="og:title" content="Why Discord moved Read States from Go to Rust" />
     <meta
       property="og:description"
-      content="A short explainer of Discord's 2020 rewrite, plus a demo that reproduces the workload in Go and Rust."
+      content="A short explainer of Discord's 2020 rewrite, plus the same cache running live in Go and Rust."
     />
     <meta property="og:url" content="https://read-state.dannyobrien.dev/" />
     <meta property="og:image" content="https://read-state.dannyobrien.dev/og.png" />
@@ -38,7 +38,8 @@
     <main>
       <h1>Why Discord moved Read States from <span class="go">Go</span> to <span class="rust">Rust</span></h1>
       <p class="lede">
-        A short explainer of Discord's 2020 rewrite, plus a small demo that reproduces the workload in Go and Rust.
+        A short explainer of Discord's 2020 rewrite, plus the same cache running live in your browser, built from Go and
+        from Rust.
       </p>
       <p class="links">
         <a href="https://github.com/danmcfan/read-state">Source on GitHub</a
@@ -53,6 +54,13 @@
         service tracks that: one small record per user, per channel, holding things like the last message read and the
         mention count.
       </p>
+      <figure class="chart diagram">
+        <div class="head"><span class="title">Where read states live</span></div>
+        <div id="read-states-diagram"></div>
+        <figcaption>
+          Every client event updates a read state. The service answers from memory and writes changes back.
+        </figcaption>
+      </figure>
       <p>
         It sits on the hot path. It is hit on every connection, every message sent, and every message read, so it has to
         be fast all the time, not just on average.
@@ -61,6 +69,19 @@
         To keep it fast, each instance keeps recently used read states in memory in an
         <strong>LRU cache</strong> holding millions of entries, and writes changes back to the database.
       </p>
+      <p>
+        An LRU (least recently used) cache has a fixed number of slots. A write to an entry that is already cached moves
+        it to the front. A new entry goes in front too, and when the cache is full the entry at the back, the one
+        untouched for longest, is evicted. Step through it:
+      </p>
+      <figure class="chart diagram">
+        <div class="head"><span class="title">An LRU cache with five slots</span></div>
+        <div id="lru-diagram"></div>
+        <figcaption>
+          The Go and Rust caches in this repo follow the same rule with millions of slots: a hash map finds the entry,
+          and a linked list keeps the order.
+        </figcaption>
+      </figure>
 
       <h2 id="problem">
         <a class="anchor" href="#problem" aria-label="Link to this section">#</a>The problem: garbage collection spikes
@@ -79,10 +100,24 @@
         cache made each scan cheaper, but more requests missed the cache and went to the database, so tail latency got
         worse.
       </p>
+      <figure class="chart diagram">
+        <div class="head">
+          <span class="title">Latency over time, schematic</span
+          ><span class="legend"
+            ><span><i style="background: var(--go-fill)"></i>Go</span
+            ><span><i style="background: var(--rust-fill)"></i>Rust</span></span
+          >
+        </div>
+        <div id="gc-diagram"></div>
+        <figcaption>
+          Not a measurement: the shape Discord reported. Between collections both are fast; at each forced GC, Go's
+          latency spikes.
+        </figcaption>
+      </figure>
 
       <figure class="chart">
         <div class="head">
-          <span class="title">CPU while the demo runs</span
+          <span class="title">CPU in an earlier native run</span
           ><span class="legend"
             ><span><i style="background: var(--go-fill)"></i>Go</span
             ><span><i style="background: var(--rust-fill)"></i>Rust</span></span
@@ -90,11 +125,11 @@
         </div>
         <div id="cpu-chart"></div>
         <figcaption>
-          A real 10-minute run of this repo's demo on a 10-core Mac, with all four programs running at once. The repo
-          has since dropped two of those programs, which shared the machine during this run; isolated measurements will
-          replace this chart. CPU is sampled every 5 seconds; 100% is one core. Dashed lines mark Go's forced
-          collections from <code>GODEBUG=gctrace=1</code>. Each one spent 4 to 22 seconds of CPU marking a heap of 1.1
-          to 1.6 GB, taking longer as the cache filled.
+          A real 10-minute run of an earlier native version of this repo's demo on a 10-core Mac, with all four programs
+          running at once. The repo has since dropped two of those programs, which shared the machine during this run;
+          isolated measurements will replace this chart. CPU is sampled every 5 seconds; 100% is one core. Dashed lines
+          mark Go's forced collections from <code>GODEBUG=gctrace=1</code>. Each one spent 4 to 22 seconds of CPU
+          marking a heap of 1.1 to 1.6 GB, taking longer as the cache filled.
         </figcaption>
         <div id="cpu-table"></div>
       </figure>
@@ -104,6 +139,14 @@
         <span class="rust">Rust</span> has no garbage collector. Memory is freed as soon as its owner goes out of scope,
         so an evicted cache entry is freed the moment it is evicted. There is no periodic pass over the whole heap.
       </p>
+      <figure class="chart diagram">
+        <div class="head"><span class="title">The same cache, two ways to free memory</span></div>
+        <div id="rewrite-diagram"></div>
+        <figcaption>
+          Go's collector has to find live entries by walking them, so its cost tracks the cache size. Rust knows when
+          each entry dies.
+        </figcaption>
+      </figure>
       <div class="cards">
         <div class="card go-card">
           <h3 class="go">Go version</h3>
@@ -133,8 +176,8 @@
       <p>
         The same cache, compiled to WebAssembly, can run right here in your browser. Press Start to run the
         <span class="go">Go</span> and <span class="rust">Rust</span> builds side by side, each in its own worker. Every
-        point is one batch of 20,000 writes to a cache of 2,000,000 entries, run back to back, which is smaller and
-        busier than the native demo below; dashed lines mark Go garbage collections.
+        point is one batch of 20,000 writes to a cache of 2,000,000 entries, run back to back; dashed lines mark Go
+        garbage collections.
       </p>
       <figure class="chart">
         <div class="head">
@@ -146,83 +189,27 @@
         </div>
         <div id="live-chart"></div>
         <figcaption>
-          Browser WASM is slower than native code, and Go's WASM build runs its collector on a single thread, so the
-          numbers differ from Discord's servers. The shape is what matters: watch for Go's spikes when a collection
-          runs.
+          Browser WASM is slower than native code, so the numbers differ from Discord's servers. Go's WASM runtime is
+          also different from native Go in two ways. It is single-threaded, so each collection pauses the whole program
+          instead of running beside it on other cores. And it has no background monitor thread, so the two-minute forced
+          GC never fires: every collection here is triggered by heap growth. The shape is what matters: watch for Go's
+          spikes when a collection runs.
         </figcaption>
       </figure>
 
-      <h2 id="demo"><a class="anchor" href="#demo" aria-label="Link to this section">#</a>The demo in this repo</h2>
+      <h2 id="demo"><a class="anchor" href="#demo" aria-label="Link to this section">#</a>Run it yourself</h2>
       <p>
-        This repository reproduces the shape of that workload so you can watch the difference yourself. Each program
-        runs a single-threaded LRU cache with a capacity of 20,000,000 entries, writes 20,000 random key/value pairs,
-        sleeps 100ms, and repeats forever.
-      </p>
-      <p>
-        Keys come from a range a little larger than the cache (25 million), so once it warms up most writes update an
-        entry that is already cached. Like Discord's service, the cache is large and long-lived but creates little
-        garbage.
-      </p>
-      <table>
-        <thead>
-          <tr>
-            <th>Language</th>
-            <th>File</th>
-            <th>Cache</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><span class="dot go"></span>Go</td>
-            <td><code>main.go</code></td>
-            <td><code>map</code> + <code>container/list</code></td>
-          </tr>
-          <tr>
-            <td><span class="dot rust"></span>Rust</td>
-            <td><code>src/main.rs</code></td>
-            <td><code>HashMap</code> + index-based linked list</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <h3>Run it</h3>
-      <p class="note">
-        You need Go 1.22+ or a Rust toolchain, depending on which you run. Once the cache is full, Rust uses about 1.5
-        GB of memory and Go uses 2 GB or more, so run one at a time on smaller machines.
+        Both caches live in this repository: <code>cache_list.go</code> (a <code>map</code> plus
+        <code>container/list</code>) and <code>src/lib.rs</code> (a <code>HashMap</code> plus an index-based linked
+        list). The live chart above runs them as WebAssembly.
       </p>
       <div class="cmds">
         <div class="cmd">
           <span class="tag">Clone</span
           ><code>git clone https://github.com/danmcfan/read-state.git &amp;&amp; cd read-state</code>
         </div>
-        <div class="cmd"><span class="tag go">Go</span><code>go run .</code></div>
-        <div class="cmd"><span class="tag rust">Rust</span><code>cargo run --release</code></div>
+        <div class="cmd"><span class="tag">Run</span><code>bun install &amp;&amp; bun run dev</code></div>
       </div>
-
-      <h3>What you'll see</h3>
-      <p>
-        Watch CPU and memory in <code>htop</code> or Activity Monitor. To print each Go collection, run
-        <code>GODEBUG=gctrace=1 go run .</code>.
-      </p>
-      <ul>
-        <li>
-          <strong>Warm-up.</strong> The cache takes about 45 million writes to fill, which is a few minutes at full
-          speed. Memory climbs during this time and then levels off.
-        </li>
-        <li>
-          <strong>Memory once full.</strong> Rust levels off at about 1.5 GB and stays flat after that. At 10 minutes,
-          Go was at about 1.8 GB and still rising slowly as its cache filled.
-        </li>
-        <li>
-          <span class="go">Go</span><strong> every two minutes.</strong> With <code>gctrace</code> on you'll see a
-          <code>GC forced</code> line, then a collection that scans the whole cache. In the run above, each one used 4
-          to 22 seconds of CPU across cores, and Go's CPU jumped from about 55% to between 147% and 195%.
-        </li>
-        <li>
-          <span class="rust">Rust</span><strong> stays steady.</strong> There is no collector, so there are no periodic
-          spikes. Its CPU stayed under 70% for the whole run.
-        </li>
-      </ul>
 
       <footer>
         Source:

@@ -40,7 +40,7 @@ await verify("page", async (v) => {
       document.querySelectorAll('.cmd button.copy').length,
     ])`,
   );
-  v.check(counts === "[120,4,120,3]", "120 points, 4 forced GCs, 120 table rows, 3 copy buttons", counts);
+  v.check(counts === "[120,4,120,2]", "120 points, 4 forced GCs, 120 table rows, 2 copy buttons", counts);
 
   await v.run("hover", "#cpu-chart rect");
   await v.until(
