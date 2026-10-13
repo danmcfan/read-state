@@ -1,7 +1,35 @@
 {
+  "name": "read-state",
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test test/*.test.mjs"
+    "prepare": "git config core.hooksPath .githooks",
+    "dev": "bunx --bun vite",
+    "build": "bunx --bun vite build",
+    "preview": "bunx --bun vite preview",
+    "build:wasm": "scripts/build-wasm.sh",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint --type-aware --deny-warnings --report-unused-disable-directives && bun scripts/lint-guards.ts",
+    "lint:fix": "oxlint --type-aware --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "knip": "knip --no-progress",
+    "test": "bun test",
+    "test:native": "go vet ./... && go test ./... && cargo test --quiet",
+    "verify": "bun scripts/verify.ts",
+    "check": "bun run typecheck && bun run lint && bun run format:check && bun run knip && bun test && bun run build && bun run test:native"
+  },
+  "dependencies": {
+    "solid-js": "1.9.17"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.2",
+    "knip": "6.41.0",
+    "oxlint": "1.88.0",
+    "oxlint-tsgolint": "7.0.2004",
+    "prettier": "3.9.10",
+    "typescript": "7.0.2",
+    "vite": "8.3.4",
+    "vite-plugin-solid": "2.11.14"
   }
 }

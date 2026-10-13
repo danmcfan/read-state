@@ -1,0 +1,12 @@
+#!/bin/sh
+# Work reaches main only through a reviewed PR (docs/agents/delivery.md).
+# Installed by `bun install` (the `prepare` script).
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  if [ "$remote_ref" = "refs/heads/main" ]; then
+    echo "pre-push: pushing to main is blocked. Push a branch and open a PR (docs/agents/delivery.md)." >&2
+    exit 1
+  fi
+done
+
+exec bun run check
