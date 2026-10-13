@@ -12,6 +12,10 @@
 
 use std::collections::{BTreeMap, HashMap};
 
+pub mod workload;
+#[cfg(target_arch = "wasm32")]
+mod wasm;
+
 /// A link between entries: a slot index or none.
 pub trait Link: Copy + PartialEq {
     const NONE: Self;
