@@ -15,22 +15,30 @@ pub struct Workload {
 impl Workload {
     /// A workload over a cache of `capacity`, filled with keys
     /// `0..capacity`. The key range is `capacity * 5 / 4`.
+    ///
+    /// # Panics
+    ///
+    /// If `capacity` does not fit in an `i64`.
+    #[must_use]
     pub fn new(capacity: usize) -> Self {
         let mut cache = HashWide::new(capacity);
-        for k in 0..capacity as i64 {
+        let keys = i64::try_from(capacity).expect("capacity fits in i64");
+        for k in 0..keys {
             cache.put(k, k);
         }
         Workload {
             cache,
-            keys: capacity as i64 * 5 / 4,
+            keys: keys * 5 / 4,
             rng: 0x9E37_79B9_7F4A_7C15,
         }
     }
 
+    #[must_use]
     pub fn cache(&self) -> &HashWide {
         &self.cache
     }
 
+    #[must_use]
     pub fn keys(&self) -> i64 {
         self.keys
     }
@@ -41,7 +49,7 @@ impl Workload {
             self.rng ^= self.rng << 13;
             self.rng ^= self.rng >> 7;
             self.rng ^= self.rng << 17;
-            let k = (self.rng >> 1) as i64 % self.keys;
+            let k = (self.rng >> 1).cast_signed() % self.keys;
             if self.rng & 1 == 0 {
                 if self.cache.get(k).is_none() {
                     self.cache.put(k, k);

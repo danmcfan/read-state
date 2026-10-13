@@ -40,6 +40,7 @@ func NewLRUCache(capacity int) *LRUCache {
 	}
 }
 
+// Get returns the value for k and marks it most recently used.
 func (c *LRUCache) Get(k int64) (int64, bool) {
 	if elem, ok := c.cache[k]; ok {
 		c.list.MoveToFront(elem)
@@ -48,6 +49,9 @@ func (c *LRUCache) Get(k int64) (int64, bool) {
 	return 0, false
 }
 
+// Put sets k to v and marks it most recently used, evicting the least
+// recently used entry when the cache is full. It reports whether k was
+// already present and whether an entry was evicted.
 func (c *LRUCache) Put(k, v int64) (existed, evicted bool) {
 	if elem, ok := c.cache[k]; ok {
 		c.list.MoveToFront(elem)
@@ -69,4 +73,5 @@ func (c *LRUCache) Put(k, v int64) (existed, evicted bool) {
 	return false, evicted
 }
 
+// Len returns the number of entries.
 func (c *LRUCache) Len() int { return len(c.cache) }
