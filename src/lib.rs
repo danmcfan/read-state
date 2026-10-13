@@ -59,7 +59,7 @@ pub fn max_capacity<L: Link>() -> usize {
 
 /// A map from key to slot index.
 pub trait KeyIndex {
-    /// Name recorded in the config record (`hash` or `btree`).
+    /// The key index's name (`hash` or `btree`).
     const NAME: &'static str;
     fn with_capacity(n: usize) -> Self;
     fn get(&self, k: i64) -> Option<usize>;
@@ -100,7 +100,7 @@ key_index!(HashMap, u32, "hash", HashMap::with_capacity);
 key_index!(BTreeMap, usize, "btree", |_| BTreeMap::new());
 key_index!(BTreeMap, u32, "btree", |_| BTreeMap::new());
 
-/// What the measurement loop needs from a cache.
+/// An LRU cache of `i64` keys and values.
 pub trait Cache {
     /// The size of one entry in the list, without map overhead.
     const ENTRY_BYTES: usize;
@@ -129,7 +129,7 @@ pub struct LruCache<M, L> {
     tail: L,
 }
 
-/// The four variants: `--map` × `--compact`.
+/// The four variants: key index (`HashMap` or `BTreeMap`) × link width.
 pub type HashWide = LruCache<HashMap<i64, usize>, Option<usize>>;
 pub type HashCompact = LruCache<HashMap<i64, u32>, u32>;
 pub type BTreeWide = LruCache<BTreeMap<i64, usize>, Option<usize>>;

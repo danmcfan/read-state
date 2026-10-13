@@ -1,11 +1,10 @@
-package main
+// Package readstate is the Go side of the Read State demo: the LRU cache that
+// Discord's Go service used, a map of pointers into a doubly linked list.
+package readstate
 
-import (
-	"container/list"
-	"unsafe"
-)
+import "container/list"
 
-// Cache is an LRU cache of int64 keys and values. Every layout implements it.
+// Cache is an LRU cache of int64 keys and values.
 type Cache interface {
 	// Get returns the value for k. A hit moves k to the front.
 	Get(k int64) (int64, bool)
@@ -31,12 +30,8 @@ type LRUCache struct {
 	list     *list.List
 }
 
-// listEntryBytes is the size of one cached entry's structs (the entry and its
-// list.Element), not counting the map slot or allocator size-class rounding.
-const listEntryBytes = int(unsafe.Sizeof(entry{}) + unsafe.Sizeof(list.Element{}))
-
-// NewLRUCache returns an empty list-layout cache. The map is preallocated, as
-// every other layout is, so filling it doesn't rehash.
+// NewLRUCache returns an empty list-layout cache. The map is preallocated so
+// filling it doesn't rehash.
 func NewLRUCache(capacity int) *LRUCache {
 	return &LRUCache{
 		capacity: capacity,
