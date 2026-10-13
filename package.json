@@ -1,0 +1,8 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:wasm": "scripts/build-wasm.sh",
+    "test": "node --test test/*.test.mjs"
+  }
+}

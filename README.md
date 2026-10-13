@@ -17,6 +17,25 @@ Every Go entry is a separate heap object full of pointers, which the garbage col
 
 Run the tests with `go test ./...` and `cargo test`.
 
+## WASM builds
+
+Both caches also run in the browser, driven by the same workload (`workload.go`, `src/workload.rs`): a cache pre-filled to capacity, then random keys over a range of `capacity * 5 / 4`, half Gets (Putting on a miss) and half Puts.
+
+| Build | Source         | Output           | Loaded as                                    |
+| ----- | -------------- | ---------------- | -------------------------------------------- |
+| Go    | `cmd/wasm`     | `site/wasm/go`   | `wasm_exec.js` + `readstate.wasm`, then the `readStateGo` global |
+| Rust  | `src/wasm.rs`  | `site/wasm/rust` | ES module `read_state.js` (wasm-pack, `--target web`) |
+
+Both expose `init(capacity)`, which builds a fresh, pre-filled cache, and `runBatch(n)`, which runs `n` operations and returns the elapsed milliseconds. The Go build also exposes `forceGC()` and `heapStats()`, which returns `{ heapAlloc, numGC, lastPauseMs }`.
+
+The built files are committed. After changing either cache or workload, rebuild them all with:
+
+```sh
+scripts/build-wasm.sh
+```
+
+This needs Go, the `wasm32-unknown-unknown` Rust target (`rustup target add wasm32-unknown-unknown`) and [`wasm-pack`](https://github.com/wasm-bindgen/wasm-pack) (`cargo install wasm-pack`). Then check the builds under Node with `npm test`.
+
 ## Site
 
 The explainer lives in `site/index.html`, a single static page with no build step. `.github/workflows/pages.yml` deploys it to GitHub Pages on every push to `main` that changes `site/**`.
