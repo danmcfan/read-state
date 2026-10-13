@@ -223,7 +223,7 @@
     <p>Discord reported that even with only basic optimization, the Rust port outperformed the hand-tuned Go service, and after some profiling it beat Go on latency, CPU, and memory. Without a GC cost, they could also raise the cache capacity to 8 million read states, which cut database reads further. Along the way they swapped the cache's <code>HashMap</code> for a <code>BTreeMap</code> to save memory.</p>
 
     <h2 id="live"><a class="anchor" href="#live" aria-label="Link to this section">#</a>Watch it live</h2>
-    <p>The same cache, compiled to WebAssembly, can run right here in your browser. Press Start to run the <span class="go">Go</span> and <span class="rust">Rust</span> builds side by side, each in its own worker. Every point is one batch of 20,000 writes to a cache of 2,000,000 entries; dashed lines mark Go garbage collections.</p>
+    <p>The same cache, compiled to WebAssembly, can run right here in your browser. Press Start to run the <span class="go">Go</span> and <span class="rust">Rust</span> builds side by side, each in its own worker. Every point is one batch of 20,000 writes to a cache of 2,000,000 entries, run back to back, which is smaller and busier than the native demo below; dashed lines mark Go garbage collections.</p>
     <figure class="chart" id="live-chart">
       <div class="head"><span class="title">Latency per batch, last 30 seconds</span><span class="legend"><span><i style="background:var(--go-fill)"></i>Go</span><span><i style="background:var(--rust-fill)"></i>Rust</span></span></div>
       <div class="plot"><svg viewBox="0 0 680 250" role="img" aria-label="Live per-batch latency for Go and Rust"><g class="grid"></g><g class="gc"></g><polyline class="go-line" fill="none" stroke-width="2" stroke-linejoin="round" stroke="var(--go-fill)"/><polyline class="rust-line" fill="none" stroke-width="2" stroke-linejoin="round" stroke="var(--rust-fill)"/></svg></div>
@@ -307,7 +307,7 @@
     })();
   </script>
   <script type="module">
-    import { Window, niceMax, polyline } from './live.mjs';
+    import { TimeWindow, niceMax, polyline } from './live.mjs';
 
     const fig = document.getElementById('live-chart');
     const svg = fig.querySelector('svg'), btn = document.getElementById('live-toggle'), stats = fig.querySelector('.stats');
@@ -325,8 +325,9 @@
 
     function draw() {
       frame = 0;
-      const end = Math.max(series.go.end, series.rust.end), t0 = end - SPAN;
-      const yMax = niceMax(Math.max(series.go.max(), series.rust.max()));
+      const all = Object.values(series);
+      const end = Math.max(...all.map((w) => w.end)), t0 = end - SPAN;
+      const yMax = niceMax(Math.max(...all.map((w) => w.max())));
       const grid = svg.querySelector('.grid'), gc = svg.querySelector('.gc');
       grid.replaceChildren();
       for (let i = 0; i <= 2; i++) {
@@ -339,15 +340,14 @@
         const x = box.left + (s.t - t0) / SPAN * box.width;
         gc.append(el('line', { x1: x, x2: x, y1: box.top - 4, y2: box.top + box.height }));
       }
-      svg.querySelector('.go-line').setAttribute('points', polyline(series.go.samples, t0, end, yMax, box));
-      svg.querySelector('.rust-line').setAttribute('points', polyline(series.rust.samples, t0, end, yMax, box));
+      for (const lang in series) svg.querySelector(`.${lang}-line`).setAttribute('points', polyline(series[lang].samples, t0, end, yMax, box));
       const last = (w) => w.samples.length ? fmt(w.samples.at(-1).ms) + ' ms' : 'loading';
       const gcs = series.go.samples.reduce((n, s) => n + (s.gc ? s.gc.count : 0), 0);
       stats.textContent = `Go ${last(series.go)} · Rust ${last(series.rust)} · ${gcs} Go GCs in view`;
     }
 
     function start() {
-      series = { go: new Window(SPAN), rust: new Window(SPAN) };
+      series = { go: new TimeWindow(SPAN), rust: new TimeWindow(SPAN) };
       workers = ['go', 'rust'].map((lang) => {
         const w = new Worker(new URL('./worker.mjs', import.meta.url), { type: 'module' });
         w.onmessage = ({ data }) => {
@@ -366,6 +366,8 @@
     function stop() {
       workers.forEach((w) => w.terminate());
       workers = [];
+      cancelAnimationFrame(frame);
+      frame = 0;
       btn.textContent = 'Start';
     }
 

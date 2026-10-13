@@ -1,10 +1,10 @@
 // Pure helpers behind the live latency chart in site/live.mjs.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Window, gcEvent, niceMax, polyline } from "../site/live.mjs";
+import { TimeWindow, gcEvent, niceMax, polyline } from "../site/live.mjs";
 
-test("Window keeps only samples inside the time span", () => {
-  const w = new Window(1000);
+test("TimeWindow keeps only samples inside the time span", () => {
+  const w = new TimeWindow(1000);
   w.push({ t: 0, ms: 1 });
   w.push({ t: 600, ms: 2 });
   w.push({ t: 1500, ms: 3 });
@@ -13,8 +13,8 @@ test("Window keeps only samples inside the time span", () => {
   assert.equal(w.start, 500);
 });
 
-test("Window.max ignores samples outside the span", () => {
-  const w = new Window(1000);
+test("TimeWindow.max ignores samples outside the span", () => {
+  const w = new TimeWindow(1000);
   w.push({ t: 0, ms: 50 });
   w.push({ t: 2000, ms: 4 });
   assert.equal(w.max(), 4);

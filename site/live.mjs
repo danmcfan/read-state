@@ -1,7 +1,7 @@
 // Pure helpers for the live latency chart: no DOM, so they run under Node.
 
-// Window holds the samples ({ t, ms, gc? }) from the last `span` milliseconds.
-export class Window {
+// TimeWindow holds the samples ({ t, ms, gc? }) from the last `span` milliseconds.
+export class TimeWindow {
   constructor(span) {
     this.span = span;
     this.samples = [];
