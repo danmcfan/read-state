@@ -4,6 +4,7 @@ import { render } from "solid-js/web";
 import type { JSX } from "solid-js";
 import { CopyButton } from "./CopyButton.tsx";
 import { CpuChart, CpuTable } from "./CpuChart.tsx";
+import { GcTimelineDiagram, LruDiagram, ReadStatesDiagram, RewriteDiagram } from "./Diagrams.tsx";
 import { LiveChart } from "./LiveChart.tsx";
 import { ThemeToggle } from "./ThemeToggle.tsx";
 
@@ -14,6 +15,10 @@ function mount(id: string, view: () => JSX.Element): void {
 }
 
 mount("theme-toggle", () => <ThemeToggle />);
+mount("read-states-diagram", () => <ReadStatesDiagram />);
+mount("lru-diagram", () => <LruDiagram />);
+mount("gc-diagram", () => <GcTimelineDiagram />);
+mount("rewrite-diagram", () => <RewriteDiagram />);
 mount("cpu-chart", () => <CpuChart />);
 mount("cpu-table", () => <CpuTable />);
 mount("live-chart", () => <LiveChart />);
