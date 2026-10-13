@@ -1,0 +1,3 @@
+# The dev server (scripts/serve.ts) compiles Solid JSX with this plugin.
+[serve.static]
+plugins = ["./scripts/solid-plugin.ts"]

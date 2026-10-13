@@ -1,0 +1,8 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": ["site/index.html", "site/src/main.tsx", "site/src/worker.ts", "scripts/*.ts", "scripts/verify/*.ts"],
+  "project": ["site/src/**/*.{ts,tsx}", "scripts/**/*.ts"],
+  "ignoreExportsUsedInFile": true,
+  "ignoreBinaries": ["go"],
+  "ignoreDependencies": ["babel-preset-solid", "@babel/plugin-syntax-typescript"]
+}

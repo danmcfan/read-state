@@ -1,0 +1,38 @@
+# Run the quality gate (docs/agents/quality-gate.md) on every pull request.
+name: CI
+
+on:
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Typecheck
+        run: bun run typecheck
+      - name: Lint
+        run: bun run lint
+      - name: Format
+        run: bun run format:check
+      - name: Unused code
+        run: bun run knip
+      - name: Test
+        run: bun test
+      - name: Build
+        run: bun run build
+      - name: Go and Rust
+        run: bun run test:native

@@ -1,0 +1,8 @@
+dist/
+out/
+target/
+site/wasm/
+bun.lock
+Cargo.lock
+*.go
+*.rs

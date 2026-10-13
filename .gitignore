@@ -1,2 +1,5 @@
 /target
 /bin
+node_modules/
+dist/
+out/
