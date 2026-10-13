@@ -25,8 +25,16 @@
     <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="stylesheet" href="./styles.css" />
+    <script>
+      // Apply a saved theme before first paint (ThemeToggle.tsx writes it).
+      try {
+        const theme = localStorage.getItem("theme");
+        if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
+      } catch {}
+    </script>
   </head>
   <body>
+    <div id="theme-toggle"></div>
     <main>
       <h1>Why Discord moved Read States from <span class="go">Go</span> to <span class="rust">Rust</span></h1>
       <p class="lede">

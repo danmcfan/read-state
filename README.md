@@ -21,10 +21,10 @@ Run the tests with `go test ./...` and `cargo test`.
 
 Both caches also run in the browser, driven by the same workload (`workload.go`, `src/workload.rs`): a cache pre-filled to capacity, then random keys over a range of `capacity * 5 / 4`, half Gets (Putting on a miss) and half Puts.
 
-| Build | Source        | Output           | Loaded as                                                        |
-| ----- | ------------- | ---------------- | ---------------------------------------------------------------- |
-| Go    | `cmd/wasm`    | `site/wasm/go`   | `wasm_exec.js` + `readstate.wasm`, then the `readStateGo` global |
-| Rust  | `src/wasm.rs` | `site/wasm/rust` | ES module `read_state.js` (wasm-pack, `--target web`)            |
+| Build | Source        | Output                  | Loaded as                                                        |
+| ----- | ------------- | ----------------------- | ---------------------------------------------------------------- |
+| Go    | `cmd/wasm`    | `site/public/wasm/go`   | `wasm_exec.js` + `readstate.wasm`, then the `readStateGo` global |
+| Rust  | `src/wasm.rs` | `site/public/wasm/rust` | ES module `read_state.js` (wasm-pack, `--target web`)            |
 
 Both expose `init(capacity)`, which builds a fresh, pre-filled cache, and `runBatch(n)`, which runs `n` operations and returns the elapsed milliseconds (NaN before `init`). The Go build also exposes `forceGC()` and `heapStats()`, which returns `{ heapAlloc, numGC, lastPauseMs }`.
 
@@ -38,11 +38,11 @@ This needs Go, the `wasm32-unknown-unknown` Rust target (`rustup target add wasm
 
 ## Site
 
-The explainer is `site/index.html` (the article) plus SolidJS components in `site/src/` for the charts and buttons, built with Bun (`docs/adr/0001-site-on-bun-solid-typescript.md`).
+The explainer is `site/index.html` (the article) plus SolidJS components in `site/src/` for the charts and buttons, built with Vite and run by Bun (`docs/adr/0001-site-on-vite-solid-typescript.md`). It follows the system light or dark theme, and the toggle in the corner overrides it.
 
 ```sh
 bun install        # also installs the git hooks
-bun run dev        # http://localhost:3000, hot reload
+bun run dev        # Vite dev server at http://localhost:3000
 bun run check      # the quality gate: types, lint, format, unused code, tests, build, Go and Rust
 bun run verify     # browser checks with agent-browser; screenshots in out/verify/
 ```

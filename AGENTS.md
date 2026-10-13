@@ -16,7 +16,7 @@ Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/ag
 
 ## Site
 
-Bun + SolidJS + strict TypeScript (`docs/adr/0001-site-on-bun-solid-typescript.md`). Gate: `bun run check` (`docs/agents/quality-gate.md`). Browser checks for any `site/` change: `bun run verify` (`docs/agents/verification.md`).
+Vite + SolidJS + strict TypeScript, run by Bun (`docs/adr/0001-site-on-vite-solid-typescript.md`). Gate: `bun run check` (`docs/agents/quality-gate.md`). Browser checks for any `site/` change: `bun run verify` (`docs/agents/verification.md`).
 
 ## Delivery
 

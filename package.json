@@ -4,8 +4,9 @@
   "type": "module",
   "scripts": {
     "prepare": "git config core.hooksPath .githooks",
-    "dev": "bun scripts/serve.ts",
-    "build": "bun scripts/build.ts",
+    "dev": "bunx --bun vite",
+    "build": "bunx --bun vite build",
+    "preview": "bunx --bun vite preview",
     "build:wasm": "scripts/build-wasm.sh",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint --type-aware --deny-warnings --report-unused-disable-directives && bun scripts/lint-guards.ts",
@@ -22,15 +23,13 @@
     "solid-js": "1.9.17"
   },
   "devDependencies": {
-    "@babel/core": "7.29.7",
-    "@babel/plugin-syntax-typescript": "7.29.7",
-    "@types/babel__core": "7.20.5",
     "@types/bun": "1.4.2",
-    "babel-preset-solid": "1.9.16",
     "knip": "6.41.0",
     "oxlint": "1.88.0",
     "oxlint-tsgolint": "7.0.2004",
     "prettier": "3.9.10",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "vite": "8.3.4",
+    "vite-plugin-solid": "2.11.14"
   }
 }

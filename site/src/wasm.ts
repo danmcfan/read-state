@@ -1,4 +1,5 @@
-// Loads the committed WASM builds in site/wasm/ (scripts/build-wasm.sh).
+// Loads the committed WASM builds in site/public/wasm/ (scripts/build-wasm.sh).
+// They are served as they are, not bundled, hence the runtime imports below.
 // Shared by the worker (browser) and wasm.test.ts (Bun), which differ only in
 // the base URL: http(s) in the browser, file:// under Bun.
 
@@ -72,7 +73,7 @@ async function bytes(url: URL): Promise<ArrayBuffer> {
 }
 
 async function loadGo(base: URL): Promise<Cache> {
-  await import(new URL("go/wasm_exec.js", base).href);
+  await import(/* @vite-ignore */ new URL("go/wasm_exec.js", base).href);
   if (globalThis.Go === undefined) throw new Error("wasm_exec.js did not define Go");
   const go = new globalThis.Go();
   const { instance } = await WebAssembly.instantiate(await bytes(new URL("go/readstate.wasm", base)), go.importObject);
@@ -82,11 +83,11 @@ async function loadGo(base: URL): Promise<Cache> {
 }
 
 async function loadRust(base: URL): Promise<Cache> {
-  const mod: unknown = await import(new URL("rust/read_state.js", base).href);
+  const mod: unknown = await import(/* @vite-ignore */ new URL("rust/read_state.js", base).href);
   if (!isRecord(mod) || !isFn(mod["default"])) throw new Error("rust build has no default init export");
   await Reflect.apply(mod["default"], mod, [{ module_or_path: await bytes(new URL("rust/read_state_bg.wasm", base)) }]);
   return toCache(mod, "rust");
 }
 
-/** Load a build from `base`, the URL of the site/wasm/ directory. */
+/** Load a build from `base`, the URL the site/public/wasm/ directory is served at. */
 export const loadCache: Record<Lang, (base: URL) => Promise<Cache>> = { go: loadGo, rust: loadRust };

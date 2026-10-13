@@ -5,6 +5,7 @@ import type { JSX } from "solid-js";
 import { CopyButton } from "./CopyButton.tsx";
 import { CpuChart, CpuTable } from "./CpuChart.tsx";
 import { LiveChart } from "./LiveChart.tsx";
+import { ThemeToggle } from "./ThemeToggle.tsx";
 
 function mount(id: string, view: () => JSX.Element): void {
   const el = document.querySelector(`#${id}`);
@@ -12,6 +13,7 @@ function mount(id: string, view: () => JSX.Element): void {
   render(view, el);
 }
 
+mount("theme-toggle", () => <ThemeToggle />);
 mount("cpu-chart", () => <CpuChart />);
 mount("cpu-table", () => <CpuTable />);
 mount("live-chart", () => <LiveChart />);

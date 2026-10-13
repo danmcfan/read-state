@@ -1,6 +1,4 @@
-// Runs one cache off the main thread and streams a sample per batch. Built to
-// ./worker.js beside the page (scripts/build.ts, scripts/serve.ts), because
-// Bun's bundler does not follow `new Worker(new URL(...))`.
+// Runs one cache off the main thread and streams a sample per batch.
 
 import { gcEvent, type HeapStats, type WorkerMessage, type WorkerRequest } from "./live.ts";
 import { loadCache, type Cache } from "./wasm.ts";
@@ -22,7 +20,7 @@ function loop(cache: Cache, batch: number, prev: HeapStats | undefined): void {
 
 async function start({ lang, capacity, batch }: WorkerRequest): Promise<void> {
   try {
-    const cache = await loadCache[lang](new URL("./wasm/", location.href));
+    const cache = await loadCache[lang](new URL("/wasm/", location.origin));
     cache.init(capacity);
     send({ kind: "ready" });
     loop(cache, batch, cache.heapStats?.());

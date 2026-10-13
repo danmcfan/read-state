@@ -11,7 +11,7 @@
 
 import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { root } from "./site.ts";
+const root = join(import.meta.dir, "..");
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v !== null && typeof v === "object";

@@ -28,5 +28,5 @@
     "erasableSyntaxOnly": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["site/src", "scripts"]
+  "include": ["site/src", "scripts", "vite.config.ts"]
 }

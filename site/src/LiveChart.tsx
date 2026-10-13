@@ -52,7 +52,7 @@ export function LiveChart(): JSX.Element {
   const start = (): void => {
     const windows = { go: new TimeWindow(SPAN_MS), rust: new TimeWindow(SPAN_MS) };
     const workers = LANGS.map((lang) => {
-      const w = new Worker("./worker.js", { type: "module" });
+      const w = new Worker(new URL("worker.ts", import.meta.url), { type: "module" });
       w.addEventListener("message", (e: MessageEvent<unknown>) => {
         const msg = e.data;
         if (!isWorkerMessage(msg)) return;

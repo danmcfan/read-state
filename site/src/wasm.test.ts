@@ -1,9 +1,9 @@
-// Loads the committed WASM builds in site/wasm/ under Bun and checks the API
+// Loads the committed WASM builds in site/public/wasm/ under Bun and checks the API
 // the site relies on. Rebuild them first with `bun run build:wasm`.
 import { describe, expect, test } from "bun:test";
 import { loadCache } from "./wasm.ts";
 
-const base = new URL("../wasm/", import.meta.url);
+const base = new URL("../public/wasm/", import.meta.url);
 
 const caches = { go: await loadCache.go(base), rust: await loadCache.rust(base) };
 

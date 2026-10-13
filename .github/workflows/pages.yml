@@ -4,7 +4,7 @@ name: Deploy site to GitHub Pages
 on:
   push:
     branches: [main]
-    paths: ["site/**", "scripts/**", "package.json", "bun.lock", ".github/workflows/pages.yml"]
+    paths: ["site/**", "vite.config.ts", "package.json", "bun.lock", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
 permissions:
