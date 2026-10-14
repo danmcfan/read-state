@@ -20,14 +20,19 @@ function fmt(ms: number): string {
   return ms > 0 && ms < 10 ? ms.toFixed(1) : String(Math.round(ms));
 }
 
-function latest(w: TimeWindow): string {
-  const s = w.samples.at(-1);
-  return s === undefined ? "loading" : `${fmt(s.ms)} ms`;
-}
+/** Where a run is: loading the build, filling its cache (at start or after a resize), or running batches. */
+type Phase = "loading" | "filling" | "running";
 
 interface Run {
   worker: Worker;
   window: TimeWindow;
+  phase: Phase;
+}
+
+function latest(run: Run): string {
+  const s = run.window.samples.at(-1);
+  if (run.phase !== "running" || s === undefined) return run.phase === "filling" ? "filling cache" : "loading";
+  return `${fmt(s.ms)} ms`;
 }
 
 /** A range input over a fixed list of values: the label follows the drag, `onCommit` fires on release. */
@@ -75,6 +80,8 @@ export function LiveChart(): JSX.Element {
   // at most once a frame however fast the workers post.
   const [frame, setFrame] = createSignal(0);
   const [status, setStatus] = createSignal("Not running. Each language uses a CPU core while it runs.");
+  // The last run to fail; shown ahead of any run still going.
+  const [failure, setFailure] = createSignal<string>();
   let pending = 0;
 
   const redraw = (): void => {
@@ -100,6 +107,11 @@ export function LiveChart(): JSX.Element {
     redraw();
   };
 
+  const setPhase = (lang: Lang, phase: Phase): void => {
+    const run = runs()[lang];
+    if (run !== undefined) setRuns({ ...runs(), [lang]: { ...run, phase } });
+  };
+
   const start = (lang: Lang): void => {
     const samples = new TimeWindow(SPAN_MS);
     const worker = new Worker(new URL("worker.ts", import.meta.url), { type: "module" });
@@ -107,18 +119,25 @@ export function LiveChart(): JSX.Element {
       const msg = e.data;
       if (!isWorkerMessage(msg)) return;
       switch (msg.kind) {
+        case "filling":
+          setPhase(lang, "filling");
+          return;
         case "ready":
+          setPhase(lang, "running");
           return;
-        case "error":
+        case "error": {
+          const verb = runs()[lang]?.phase === "loading" ? "failed to start" : "stopped";
           stop(lang);
-          setStatus(`${NAMES[lang]} failed to start: ${msg.error}`);
+          setFailure(`${NAMES[lang]} ${verb}: ${msg.error}`);
           return;
+        }
         case "sample":
           samples.add(msg.sample);
           redraw();
       }
     });
-    setRuns({ ...runs(), [lang]: { worker, window: samples } });
+    setFailure(undefined);
+    setRuns({ ...runs(), [lang]: { worker, window: samples, phase: "loading" } });
     send(lang, { kind: "start", lang, settings: settings() });
   };
 
@@ -146,15 +165,16 @@ export function LiveChart(): JSX.Element {
   };
 
   const stats = (): string => {
-    const v = view();
-    if (v === undefined || Object.values(v.windows).every((w) => w.samples.length === 0)) return status();
+    frame();
     const parts = LANGS.flatMap((lang) => {
-      const w = v.windows[lang];
-      return w === undefined ? [] : [`${NAMES[lang]} ${latest(w)}`];
+      const run = runs()[lang];
+      return run === undefined ? [] : [`${NAMES[lang]} ${latest(run)}`];
     });
-    const go = v.windows.go;
-    if (go !== undefined) parts.push(`${String(go.gcCount())} Go GCs in view`);
-    return parts.join(" · ");
+    const go = runs().go;
+    if (go !== undefined) parts.push(`${String(go.window.gcCount())} Go GCs in view`);
+    const fail = failure();
+    if (fail !== undefined) parts.unshift(fail);
+    return parts.length === 0 ? status() : parts.join(" · ");
   };
 
   return (
@@ -229,7 +249,7 @@ export function LiveChart(): JSX.Element {
         <button
           class="copy force-gc"
           type="button"
-          disabled={runs().go === undefined}
+          disabled={runs().go?.phase !== "running"}
           onClick={() => {
             send("go", { kind: "gc" });
           }}

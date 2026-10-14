@@ -4,7 +4,7 @@ use std::cell::{Cell, RefCell};
 
 use wasm_bindgen::prelude::*;
 
-use crate::workload::Workload;
+use crate::workload::{Workload, DEFAULT_READ_RATIO};
 
 #[wasm_bindgen]
 extern "C" {
@@ -15,7 +15,7 @@ extern "C" {
 thread_local! {
     static WORKLOAD: RefCell<Option<Workload>> = const { RefCell::new(None) };
     /// Kept across `init`, so a new cache keeps the reader's setting.
-    static READ_RATIO: Cell<u32> = const { Cell::new(50) };
+    static READ_RATIO: Cell<u32> = const { Cell::new(DEFAULT_READ_RATIO) };
 }
 
 /// Builds a fresh, pre-filled cache of `capacity`, replacing any existing one.

@@ -15,7 +15,7 @@ import (
 
 var (
 	w       *readstate.Workload
-	readPct = 50 // kept across init, so a new cache keeps the reader's setting
+	readPct = readstate.DefaultReadRatio // kept across init, so a new cache keeps the reader's setting
 )
 
 func main() {

@@ -3,6 +3,9 @@
 
 use crate::{Cache, HashWide};
 
+/// The percent of operations that are reads until `set_read_ratio` changes it.
+pub const DEFAULT_READ_RATIO: u32 = 50;
+
 /// Drives a pre-filled cache with random operations over a key range a
 /// quarter larger than the capacity. Each operation picks a random key and
 /// either gets it (a read) or puts it (a write), reading with the odds set by
@@ -33,7 +36,7 @@ impl Workload {
             cache,
             keys: keys * 5 / 4,
             rng: 0x9E37_79B9_7F4A_7C15,
-            read: 50,
+            read: DEFAULT_READ_RATIO,
         }
     }
 
@@ -47,7 +50,8 @@ impl Workload {
         self.keys
     }
 
-    /// The percent of operations that are reads.
+    /// The percent of operations that are reads, after `set_read_ratio`'s
+    /// clamping.
     #[must_use]
     pub fn read_ratio(&self) -> u32 {
         self.read
@@ -66,6 +70,8 @@ impl Workload {
             self.rng ^= self.rng >> 7;
             self.rng ^= self.rng << 17;
             let k = (self.rng >> 1).cast_signed() % self.keys;
+            // The high bits pick the operation. They overlap the bits that
+            // pick the key, which only correlates the two, identically in Go.
             if (self.rng >> 32) % 100 < u64::from(self.read) {
                 self.cache.get(k);
             } else {

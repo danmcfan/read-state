@@ -1,5 +1,9 @@
 package readstate
 
+// DefaultReadRatio is the percent of operations that are reads until
+// SetReadRatio changes it.
+const DefaultReadRatio = 50
+
 // Workload drives a pre-filled cache with random operations over a key range
 // a quarter larger than the capacity, so a steady share of operations miss.
 // Each operation picks a random key and either Gets it (a read) or Puts it (a
@@ -18,7 +22,7 @@ func NewWorkload(capacity int) *Workload {
 	for k := int64(0); k < int64(capacity); k++ {
 		c.Put(k, k)
 	}
-	return &Workload{cache: c, keys: int64(capacity) * 5 / 4, rng: 0x9E3779B97F4A7C15, read: 50}
+	return &Workload{cache: c, keys: int64(capacity) * 5 / 4, rng: 0x9E3779B97F4A7C15, read: DefaultReadRatio}
 }
 
 // Cache returns the workload's cache.
@@ -27,7 +31,8 @@ func (w *Workload) Cache() Cache { return w.cache }
 // Keys reports the size of the key range.
 func (w *Workload) Keys() int64 { return w.keys }
 
-// ReadRatio reports the percent of operations that are reads.
+// ReadRatio reports the percent of operations that are reads, after
+// SetReadRatio's clamping.
 func (w *Workload) ReadRatio() int { return int(w.read) }
 
 // SetReadRatio sets the percent of operations that are reads, clamped to
@@ -42,6 +47,8 @@ func (w *Workload) Run(n int) {
 		w.rng ^= w.rng >> 7
 		w.rng ^= w.rng << 17
 		k := int64(w.rng>>1) % w.keys
+		// The high bits pick the operation. They overlap the bits that pick
+		// the key, which only correlates the two, identically in Rust.
 		if (w.rng>>32)%100 < w.read {
 			w.cache.Get(k)
 		} else {

@@ -35,6 +35,7 @@ test("gcEvent reports new collections and the latest pause", () => {
 
 test("isWorkerMessage accepts each message kind and rejects anything else", () => {
   expect(isWorkerMessage({ kind: "ready" })).toBe(true);
+  expect(isWorkerMessage({ kind: "filling" })).toBe(true);
   expect(isWorkerMessage({ kind: "error", error: "boom" })).toBe(true);
   expect(isWorkerMessage({ kind: "sample", sample: { t: 1, ms: 2 } })).toBe(true);
   expect(isWorkerMessage({ kind: "sample", sample: { t: 1, ms: 2, gc: { count: 1, pauseMs: 0 } } })).toBe(true);

@@ -19,14 +19,14 @@ Run the tests with `go test ./...` and `cargo test`.
 
 ## WASM builds
 
-Both caches also run in the browser, driven by the same workload (`workload.go`, `src/workload.rs`): a cache pre-filled to capacity, then random keys over a range of `capacity * 5 / 4`, half Gets (Putting on a miss) and half Puts.
+Both caches also run in the browser, driven by the same workload (`workload.go`, `src/workload.rs`): a cache pre-filled to capacity, then random keys over a range of `capacity * 5 / 4`, each a Get (a read) or a Put (a write). Half are reads by default; `setReadRatio(pct)` changes the share, and a read never adds a key, so at 100% the cache stops changing.
 
 | Build | Source        | Output                  | Loaded as                                                        |
 | ----- | ------------- | ----------------------- | ---------------------------------------------------------------- |
 | Go    | `cmd/wasm`    | `site/public/wasm/go`   | `wasm_exec.js` + `readstate.wasm`, then the `readStateGo` global |
 | Rust  | `src/wasm.rs` | `site/public/wasm/rust` | ES module `read_state.js` (wasm-pack, `--target web`)            |
 
-Both expose `init(capacity)`, which builds a fresh, pre-filled cache, and `runBatch(n)`, which runs `n` operations and returns the elapsed milliseconds (NaN before `init`). The Go build also exposes `forceGC()` and `heapStats()`, which returns `{ heapAlloc, numGC, lastPauseMs }`.
+Both expose `init(capacity)`, which builds a fresh, pre-filled cache, `setReadRatio(pct)`, which is kept across `init`, and `runBatch(n)`, which runs `n` operations and returns the elapsed milliseconds (NaN before `init`). The Go build also exposes `forceGC()` and `heapStats()`, which returns `{ heapAlloc, numGC, lastPauseMs }`.
 
 The built files are committed. After changing either cache or workload, rebuild them all with:
 

@@ -50,8 +50,9 @@ export function formatCount(n: number): string {
   return String(n);
 }
 
-/** Worker to page. */
-export type WorkerMessage = { kind: "ready" } | { kind: "error"; error: string } | { kind: "sample"; sample: Sample };
+/** Worker to page: `filling` before each cache fill, `ready` once batches run, `error` when the worker stops. */
+export type WorkerMessage =
+  { kind: "filling" } | { kind: "ready" } | { kind: "error"; error: string } | { kind: "sample"; sample: Sample };
 
 /** The samples from the last `span` milliseconds. */
 export class TimeWindow {
@@ -109,6 +110,7 @@ function isSample(x: unknown): x is Sample {
 export function isWorkerMessage(x: unknown): x is WorkerMessage {
   if (!isRecord(x)) return false;
   switch (x["kind"]) {
+    case "filling":
     case "ready":
       return true;
     case "error":
