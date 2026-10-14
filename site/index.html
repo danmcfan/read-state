@@ -174,10 +174,12 @@
 
       <h2 id="live"><a class="anchor" href="#live" aria-label="Link to this section">#</a>Watch it live</h2>
       <p>
-        The same cache, compiled to WebAssembly, can run right here in your browser. Press Start to run the
-        <span class="go">Go</span> and <span class="rust">Rust</span> builds side by side, each in its own worker. Every
-        point is one batch of 20,000 writes to a cache of 2,000,000 entries, run back to back; dashed lines mark Go
-        garbage collections.
+        The same cache, compiled to WebAssembly, can run right here in your browser. Press Run Go or Run Rust (or both)
+        to run the <span class="go">Go</span> and <span class="rust">Rust</span> builds, each in its own worker. Every
+        point is one batch of reads and writes to a full cache, run back to back; dashed lines mark Go garbage
+        collections. Then experiment: Force GC runs a Go collection now, a bigger cache gives the collector more to scan
+        on each pass, a bigger batch makes each point longer, and more reads mean fewer writes, so less new memory for
+        Go to collect. At 100% reads, nothing changes in the cache at all.
       </p>
       <figure class="chart">
         <div class="head">

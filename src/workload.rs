@@ -3,13 +3,19 @@
 
 use crate::{Cache, HashWide};
 
+/// The percent of operations that are reads until `set_read_ratio` changes it.
+pub const DEFAULT_READ_RATIO: u32 = 50;
+
 /// Drives a pre-filled cache with random operations over a key range a
-/// quarter larger than the capacity. Each operation picks a random key and,
-/// with equal odds, either gets it (putting it on a miss) or puts it.
+/// quarter larger than the capacity. Each operation picks a random key and
+/// either gets it (a read) or puts it (a write), reading with the odds set by
+/// `set_read_ratio`: half by default.
 pub struct Workload {
     cache: HashWide,
     keys: i64,
     rng: u64,
+    /// Percent of operations that are reads, 0..=100.
+    read: u32,
 }
 
 impl Workload {
@@ -30,6 +36,7 @@ impl Workload {
             cache,
             keys: keys * 5 / 4,
             rng: 0x9E37_79B9_7F4A_7C15,
+            read: DEFAULT_READ_RATIO,
         }
     }
 
@@ -43,6 +50,19 @@ impl Workload {
         self.keys
     }
 
+    /// The percent of operations that are reads, after `set_read_ratio`'s
+    /// clamping.
+    #[must_use]
+    pub fn read_ratio(&self) -> u32 {
+        self.read
+    }
+
+    /// Sets the percent of operations that are reads, clamped to 0..=100.
+    /// Reads never add a key, so at 100 the cache stops changing.
+    pub fn set_read_ratio(&mut self, pct: u32) {
+        self.read = pct.min(100);
+    }
+
     /// Performs `n` operations.
     pub fn run(&mut self, n: u32) {
         for _ in 0..n {
@@ -50,10 +70,10 @@ impl Workload {
             self.rng ^= self.rng >> 7;
             self.rng ^= self.rng << 17;
             let k = (self.rng >> 1).cast_signed() % self.keys;
-            if self.rng & 1 == 0 {
-                if self.cache.get(k).is_none() {
-                    self.cache.put(k, k);
-                }
+            // The high bits pick the operation. They overlap the bits that
+            // pick the key, which only correlates the two, identically in Go.
+            if (self.rng >> 32) % 100 < u64::from(self.read) {
+                self.cache.get(k);
             } else {
                 self.cache.put(k, k);
             }
@@ -77,5 +97,34 @@ mod tests {
         let mut w = Workload::new(1000);
         w.run(50_000);
         assert_eq!(w.cache().len(), 1000);
+    }
+
+    fn new_keys(w: &mut Workload, capacity: i64) -> usize {
+        (capacity..w.keys())
+            .filter(|&k| w.cache.get(k).is_some())
+            .count()
+    }
+
+    #[test]
+    fn all_reads_never_put() {
+        let mut w = Workload::new(1000);
+        w.set_read_ratio(100);
+        w.run(50_000);
+        assert_eq!(new_keys(&mut w, 1000), 0);
+    }
+
+    #[test]
+    fn all_writes_put() {
+        let mut w = Workload::new(1000);
+        w.set_read_ratio(0);
+        w.run(50_000);
+        assert!(new_keys(&mut w, 1000) > 0);
+    }
+
+    #[test]
+    fn clamps_read_ratio() {
+        let mut w = Workload::new(10);
+        w.set_read_ratio(250);
+        assert_eq!(w.read_ratio(), 100);
     }
 }
