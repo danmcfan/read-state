@@ -18,6 +18,14 @@ export function runBatch(n) {
     const ret = wasm.runBatch(n);
     return ret;
 }
+
+/**
+ * Sets the percent of operations that are reads, now and for later `init`s.
+ * @param {number} pct
+ */
+export function setReadRatio(pct) {
+    wasm.setReadRatio(pct);
+}
 function __wbg_get_imports() {
     const import0 = {
         __proto__: null,

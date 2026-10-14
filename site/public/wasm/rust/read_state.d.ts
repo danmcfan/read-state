@@ -12,12 +12,18 @@ export function init(capacity: number): void;
  */
 export function runBatch(n: number): number;
 
+/**
+ * Sets the percent of operations that are reads, now and for later `init`s.
+ */
+export function setReadRatio(pct: number): void;
+
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly init: (a: number) => void;
     readonly runBatch: (a: number) => number;
+    readonly setReadRatio: (a: number) => void;
     readonly __wbindgen_externrefs: WebAssembly.Table;
     readonly __wbindgen_start: () => void;
 }

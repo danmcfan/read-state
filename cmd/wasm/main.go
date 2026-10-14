@@ -13,7 +13,10 @@ import (
 	"readstate"
 )
 
-var w *readstate.Workload
+var (
+	w       *readstate.Workload
+	readPct = 50 // kept across init, so a new cache keeps the reader's setting
+)
 
 func main() {
 	js.Global().Set("readStateGo", js.ValueOf(map[string]any{
@@ -21,6 +24,15 @@ func main() {
 		"init": js.FuncOf(func(_ js.Value, args []js.Value) any {
 			w = nil // let the old cache be collected before allocating the new one
 			w = readstate.NewWorkload(args[0].Int())
+			w.SetReadRatio(readPct)
+			return nil
+		}),
+		// setReadRatio(pct): the percent of operations that are reads.
+		"setReadRatio": js.FuncOf(func(_ js.Value, args []js.Value) any {
+			readPct = args[0].Int()
+			if w != nil {
+				w.SetReadRatio(readPct)
+			}
 			return nil
 		}),
 		// runBatch(n) -> elapsed milliseconds, or NaN before init. A panic

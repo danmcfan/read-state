@@ -21,6 +21,13 @@ for (const lang of ["go", "rust"] as const) {
       expect(Number.isFinite(ms) && ms > 0).toBe(true);
     });
 
+    test("setReadRatio holds across init", () => {
+      cache.setReadRatio(100);
+      cache.init(100_000);
+      expect(cache.runBatch(20_000)).toBeGreaterThan(0);
+      cache.setReadRatio(50);
+    });
+
     test("init(2_000_000) succeeds", () => {
       cache.init(2_000_000);
       expect(cache.runBatch(1_000)).toBeGreaterThan(0);

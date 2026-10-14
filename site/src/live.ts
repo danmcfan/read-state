@@ -23,11 +23,31 @@ export interface HeapStats {
   lastPauseMs: number;
 }
 
-/** Page to worker: load `lang`, fill a cache of `capacity`, then run batches of `batch` forever. */
-export interface WorkerRequest {
-  lang: Lang;
+/** The experiment a worker runs: a cache of `capacity`, batches of `batch`, `readPct` percent reads. */
+export interface Settings {
   capacity: number;
   batch: number;
+  readPct: number;
+}
+
+/**
+ * Page to worker. `start` loads `lang`, fills the cache, then runs batches
+ * forever; `settings` changes the experiment mid-run; `gc` forces a Go
+ * collection.
+ */
+export type WorkerRequest =
+  { kind: "start"; lang: Lang; settings: Settings } | { kind: "settings"; settings: Settings } | { kind: "gc" };
+
+/** What a worker must redo to move from `prev` to `next`; the batch size just applies to the next batch. */
+export function settingsChanges(prev: Settings, next: Settings): { init: boolean; readRatio: boolean } {
+  return { init: prev.capacity !== next.capacity, readRatio: prev.readPct !== next.readPct };
+}
+
+/** 500, 20k, 2M. */
+export function formatCount(n: number): string {
+  if (n >= 1_000_000) return `${String(n / 1_000_000)}M`;
+  if (n >= 1000) return `${String(n / 1000)}k`;
+  return String(n);
 }
 
 /** Worker to page. */

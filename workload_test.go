@@ -32,3 +32,44 @@ func TestWorkloadIsDeterministic(t *testing.T) {
 		}
 	}
 }
+
+// newKeys counts keys outside the prefill, which only a Put can add.
+func newKeys(w *Workload, capacity int64) int {
+	n := 0
+	for k := capacity; k < w.Keys(); k++ {
+		if _, ok := w.Cache().Get(k); ok {
+			n++
+		}
+	}
+	return n
+}
+
+func TestWorkloadAllReadsNeverPut(t *testing.T) {
+	w := NewWorkload(1000)
+	w.SetReadRatio(100)
+	w.Run(50_000)
+	if got := newKeys(w, 1000); got != 0 {
+		t.Fatalf("read ratio 100 added %d keys, want 0", got)
+	}
+}
+
+func TestWorkloadAllWritesPut(t *testing.T) {
+	w := NewWorkload(1000)
+	w.SetReadRatio(0)
+	w.Run(50_000)
+	if got := newKeys(w, 1000); got == 0 {
+		t.Fatal("read ratio 0 added no keys")
+	}
+}
+
+func TestWorkloadClampsReadRatio(t *testing.T) {
+	w := NewWorkload(10)
+	w.SetReadRatio(250)
+	if w.ReadRatio() != 100 {
+		t.Fatalf("ReadRatio = %d, want 100", w.ReadRatio())
+	}
+	w.SetReadRatio(-5)
+	if w.ReadRatio() != 0 {
+		t.Fatalf("ReadRatio = %d, want 0", w.ReadRatio())
+	}
+}

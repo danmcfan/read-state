@@ -9,6 +9,8 @@ import { isRecord, type HeapStats, type Lang } from "./live.ts";
 export interface Cache {
   /** Build a fresh, pre-filled cache of `capacity`, replacing any old one. */
   init(capacity: number): void;
+  /** Percent of operations that are reads, 0..100; kept across `init`. */
+  setReadRatio(pct: number): void;
   /** Run `n` operations; elapsed milliseconds, or NaN before `init`. */
   runBatch(n: number): number;
   heapStats?: () => HeapStats;
@@ -40,15 +42,18 @@ function isHeapStats(x: unknown): x is HeapStats {
   );
 }
 
-/** Wrap a module's untyped `init`/`runBatch` (and Go's extras) as a `Cache`. */
+/** Wrap a module's untyped `init`/`setReadRatio`/`runBatch` (and Go's extras) as a `Cache`. */
 function toCache(m: unknown, lang: Lang): Cache {
-  if (!isRecord(m) || !isFn(m["init"]) || !isFn(m["runBatch"])) {
-    throw new Error(`${lang} build does not expose init and runBatch`);
+  if (!isRecord(m) || !isFn(m["init"]) || !isFn(m["setReadRatio"]) || !isFn(m["runBatch"])) {
+    throw new Error(`${lang} build does not expose init, setReadRatio and runBatch`);
   }
-  const { init, runBatch, heapStats, forceGC } = m;
+  const { init, setReadRatio, runBatch, heapStats, forceGC } = m;
   const cache: Cache = {
     init: (capacity) => {
       Reflect.apply(init, m, [capacity]);
+    },
+    setReadRatio: (pct) => {
+      Reflect.apply(setReadRatio, m, [pct]);
     },
     runBatch: (n) => {
       const ms: unknown = Reflect.apply(runBatch, m, [n]);

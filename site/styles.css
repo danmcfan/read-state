@@ -550,3 +550,33 @@ figure.diagram .series {
   opacity: 0.5;
   cursor: default;
 }
+.live-bar .copy[aria-pressed="true"] {
+  border-color: var(--muted);
+}
+.live-bar .copy:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px 20px;
+  margin-top: 12px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.slider {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 8px;
+}
+.slider input {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  width: 100%;
+  accent-color: var(--fg);
+}
+.slider output {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--fg);
+}

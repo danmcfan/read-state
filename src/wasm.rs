@@ -1,6 +1,6 @@
-//! The browser build: `init` and `runBatch`, exported through wasm-bindgen.
+//! The browser build: `init`, `setReadRatio` and `runBatch`, exported through wasm-bindgen.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 
 use wasm_bindgen::prelude::*;
 
@@ -14,6 +14,8 @@ extern "C" {
 
 thread_local! {
     static WORKLOAD: RefCell<Option<Workload>> = const { RefCell::new(None) };
+    /// Kept across `init`, so a new cache keeps the reader's setting.
+    static READ_RATIO: Cell<u32> = const { Cell::new(50) };
 }
 
 /// Builds a fresh, pre-filled cache of `capacity`, replacing any existing one.
@@ -22,7 +24,20 @@ pub fn init(capacity: usize) {
     WORKLOAD.with(|w| {
         // Free the old cache before allocating the new one.
         *w.borrow_mut() = None;
-        *w.borrow_mut() = Some(Workload::new(capacity));
+        let mut workload = Workload::new(capacity);
+        workload.set_read_ratio(READ_RATIO.get());
+        *w.borrow_mut() = Some(workload);
+    });
+}
+
+/// Sets the percent of operations that are reads, now and for later `init`s.
+#[wasm_bindgen(js_name = setReadRatio)]
+pub fn set_read_ratio(pct: u32) {
+    READ_RATIO.set(pct);
+    WORKLOAD.with(|w| {
+        if let Some(w) = w.borrow_mut().as_mut() {
+            w.set_read_ratio(pct);
+        }
     });
 }
 
