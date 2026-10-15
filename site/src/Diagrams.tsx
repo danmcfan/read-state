@@ -5,6 +5,7 @@
 import { useState, type JSX } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { barWidth } from "./chart.ts";
 import { write, type Step } from "./lru.ts";
 
 /** Who reads where, the service that tracks it, and the database behind it. */
@@ -209,6 +210,39 @@ export function RewriteDiagram(): JSX.Element {
       <text x={370} y={184} className="small">
         no pass over the heap, so no periodic spike
       </text>
+    </svg>
+  );
+}
+
+/** Forced GC of 2 million entries in the WASM build, measured with each Go layout (issue #20). */
+const GC_PAUSES = [
+  { layout: "Pointers", ms: 280 },
+  { layout: "Pointer-free", ms: 1 },
+];
+
+/** One bar per Go layout: how long a forced collection of a full cache takes. */
+export function GcPauseBars(): JSX.Element {
+  const max = Math.max(...GC_PAUSES.map((p) => p.ms));
+  return (
+    <svg
+      viewBox="0 0 680 110"
+      role="img"
+      aria-label="A forced Go garbage collection of 2 million entries takes about 280 ms with pointers and about 1 ms pointer-free."
+    >
+      {GC_PAUSES.map((p, i) => {
+        const w = barWidth(p.ms, max, 440);
+        return (
+          <g key={p.layout} className="gc-pause">
+            <text x={120} y={40 + i * 44} textAnchor="end">
+              {p.layout}
+            </text>
+            <rect x={132} y={22 + i * 44} width={w} height={26} rx={3} fill="var(--go-fill)" />
+            <text x={140 + w} y={40 + i * 44} className="mono">
+              {`~${String(p.ms)} ms`}
+            </text>
+          </g>
+        );
+      })}
     </svg>
   );
 }

@@ -181,16 +181,6 @@
         on each pass, a bigger batch makes each point longer, and more reads mean fewer writes, so less new memory for
         Go to collect. At 100% reads, nothing changes in the cache at all.
       </p>
-      <p>
-        Could Go have kept up by holding no pointers? Switch the Go layout to pointer-free and Go refills its cache as
-        one slice of fixed-size slots linked by index, with a map from key to slot index, the same design as the Rust
-        cache. Neither holds a pointer, so the collector marks them as having nothing inside to scan. In this WASM build
-        a forced collection of 2 million entries takes around 280 ms with pointers and about 1 ms without, the same as
-        at 100 thousand. Pointers is Discord's original layout: a map of pointers into <code>container/list</code>,
-        where every entry is a heap object the collector must trace. The comparison flatters Go a little: Discord's real
-        read states held more than two integers, and anything with a string, timer or pointer in it would put the
-        collector back to work.
-      </p>
       <figure class="chart">
         <div class="head">
           <span class="title">Latency per batch, last 30 seconds</span
@@ -208,6 +198,33 @@
           spikes when a collection runs.
         </figcaption>
       </figure>
+
+      <h2 id="pointer-free">
+        <a class="anchor" href="#pointer-free" aria-label="Link to this section">#</a>Could Go keep up without pointers?
+      </h2>
+      <p>
+        Go's collector only has to trace memory that holds pointers. Pointers is Discord's original layout: a map of
+        pointers into <code>container/list</code>, where every entry is a heap object the collector must trace. Go can
+        also hold the cache as one slice of fixed-size slots linked by index, with a map from key to slot index, the
+        same design as the Rust cache. Neither holds a pointer, so the collector marks them as having nothing inside to
+        scan.
+      </p>
+      <p>
+        Try it: in the <a href="#live">chart above</a>, run Go, switch the Go layout to Pointer-free, and press Force
+        GC. Go refills its cache in the new layout, and its spikes all but vanish.
+      </p>
+      <figure class="chart diagram">
+        <div class="head"><span class="title">Forced Go GC of 2 million entries, WASM build</span></div>
+        <div id="gc-pause-bars"></div>
+        <figcaption>
+          Measured in this WASM build. Pointer-free, a collection takes about as long at 2 million entries as at 100
+          thousand.
+        </figcaption>
+      </figure>
+      <p>
+        The comparison flatters Go a little: Discord's real read states held more than two integers, and anything with a
+        string, timer or pointer in it would put the collector back to work.
+      </p>
 
       <h2 id="demo"><a class="anchor" href="#demo" aria-label="Link to this section">#</a>Run it yourself</h2>
       <p>
