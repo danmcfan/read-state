@@ -43,3 +43,8 @@ export function niceMax(v: number): number {
 export function polyline(points: readonly Point[], scale: Scale, box: Box): string {
   return points.map((p) => `${xAt(p.t, scale, box).toFixed(1)},${yAt(p.v, scale, box).toFixed(1)}`).join(" ");
 }
+
+/** Length of a bar for `v` out of `max` across `width`, never under `min` so a tiny value still shows. */
+export function barWidth(v: number, max: number, width: number, min = 2): number {
+  return Math.max(min, (v / max) * width);
+}
