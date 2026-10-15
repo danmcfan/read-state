@@ -1,11 +1,19 @@
 // Streams per-batch latency from the Go and Rust WASM builds, each in its own
 // worker, with Go's collections as dashed lines (issue #17). The controls run
 // either language, force a Go collection and change the experiment mid-run
-// (issue #19).
+// (issue #19), including Go's pointer-free layout (issue #20).
 
 import { createSignal, For, onCleanup, Show, type JSX } from "solid-js";
 import { BOX, niceMax, polyline, xAt, yAt, type Scale } from "./chart.ts";
-import { TimeWindow, formatCount, isWorkerMessage, type Lang, type Settings, type WorkerRequest } from "./live.ts";
+import {
+  TimeWindow,
+  formatCount,
+  isWorkerMessage,
+  type GoLayout,
+  type Lang,
+  type Settings,
+  type WorkerRequest,
+} from "./live.ts";
 
 const SPAN_MS = 30_000;
 const LANGS: readonly Lang[] = ["go", "rust"];
@@ -14,7 +22,11 @@ const NAMES: Record<Lang, string> = { go: "Go", rust: "Rust" };
 const CAPACITIES = [100_000, 250_000, 500_000, 1_000_000, 2_000_000];
 const BATCHES = [1000, 5000, 10_000, 20_000, 50_000, 100_000];
 const READ_PCTS = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
-const DEFAULTS: Settings = { capacity: 2_000_000, batch: 20_000, readPct: 50 };
+const DEFAULTS: Settings = { capacity: 2_000_000, batch: 20_000, readPct: 50, goLayout: "list" };
+const LAYOUTS: readonly { value: GoLayout; label: string }[] = [
+  { value: "list", label: "Pointers" },
+  { value: "slab", label: "Pointer-free" },
+];
 
 function fmt(ms: number): string {
   return ms > 0 && ms < 10 ? ms.toFixed(1) : String(Math.round(ms));
@@ -286,6 +298,25 @@ export function LiveChart(): JSX.Element {
             change({ readPct });
           }}
         />
+        <fieldset class="layout">
+          <legend>Go layout</legend>
+          <For each={LAYOUTS}>
+            {(l) => (
+              <label>
+                <input
+                  type="radio"
+                  name="go-layout"
+                  value={l.value}
+                  checked={settings().goLayout === l.value}
+                  onChange={() => {
+                    change({ goLayout: l.value });
+                  }}
+                />
+                {l.label}
+              </label>
+            )}
+          </For>
+        </fieldset>
       </div>
     </>
   );

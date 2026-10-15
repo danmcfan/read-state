@@ -43,3 +43,16 @@ test("go: forceGC increases numGC", async () => {
   const after = cache.heapStats?.();
   expect(after?.numGC ?? 0).toBeGreaterThan(before?.numGC ?? Infinity);
 });
+
+test("go: setLayout holds across init and keeps the cache working", async () => {
+  const cache = await loadCache.go(base);
+  expect(cache.setLayout).toBeDefined();
+  cache.setLayout?.("slab");
+  cache.init(100_000);
+  expect(cache.runBatch(20_000)).toBeGreaterThan(0);
+  cache.setLayout?.("list");
+});
+
+test("rust: has no setLayout", () => {
+  expect(caches.rust.setLayout).toBeUndefined();
+});

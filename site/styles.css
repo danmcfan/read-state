@@ -576,6 +576,28 @@ figure.diagram .series {
   width: 100%;
   accent-color: var(--fg);
 }
+.layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.layout legend {
+  width: 100%;
+  padding: 0;
+  margin-bottom: 2px;
+}
+.layout label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--fg);
+}
+.layout input {
+  accent-color: var(--fg);
+}
 .slider output {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   color: var(--fg);

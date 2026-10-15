@@ -23,11 +23,18 @@ export interface HeapStats {
   lastPauseMs: number;
 }
 
-/** The experiment a worker runs: a cache of `capacity`, batches of `batch`, `readPct` percent reads. */
+/** Go's cache layout: Discord's map of pointers into a list, or pointer-free slots like Rust's. */
+export type GoLayout = "list" | "slab";
+
+/**
+ * The experiment a worker runs: a cache of `capacity`, batches of `batch`,
+ * `readPct` percent reads. `goLayout` applies to Go only.
+ */
 export interface Settings {
   capacity: number;
   batch: number;
   readPct: number;
+  goLayout: GoLayout;
 }
 
 /**
@@ -38,9 +45,19 @@ export interface Settings {
 export type WorkerRequest =
   { kind: "start"; lang: Lang; settings: Settings } | { kind: "settings"; settings: Settings } | { kind: "gc" };
 
-/** What a worker must redo to move from `prev` to `next`; the batch size just applies to the next batch. */
-export function settingsChanges(prev: Settings, next: Settings): { init: boolean; readRatio: boolean } {
-  return { init: prev.capacity !== next.capacity, readRatio: prev.readPct !== next.readPct };
+/**
+ * What a worker must redo to move from `prev` to `next`; the batch size just
+ * applies to the next batch. A new layout needs a refill, but only in Go.
+ */
+export function settingsChanges(
+  prev: Settings,
+  next: Settings,
+): { init: boolean; readRatio: boolean; layout: boolean } {
+  return {
+    init: prev.capacity !== next.capacity,
+    readRatio: prev.readPct !== next.readPct,
+    layout: prev.goLayout !== next.goLayout,
+  };
 }
 
 /** 500, 20k, 2M. */
