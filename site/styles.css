@@ -1,3 +1,48 @@
+@import "tailwindcss";
+
+/* Tailwind's dark: variant follows the same rule as the light-dark() colors
+   below: the theme toggle's choice, else the system theme. */
+@custom-variant dark {
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) {
+      @slot;
+    }
+  }
+}
+
+/* shadcn/ui's semantic tokens, mapped onto the site palette. */
+@theme inline {
+  --color-background: var(--bg);
+  --color-foreground: var(--fg);
+  --color-card: var(--card);
+  --color-card-foreground: var(--fg);
+  --color-primary: var(--fg);
+  --color-primary-foreground: var(--bg);
+  --color-secondary: var(--code-bg);
+  --color-secondary-foreground: var(--fg);
+  --color-muted: var(--code-bg);
+  --color-muted-foreground: var(--muted);
+  --color-accent: var(--code-bg);
+  --color-accent-foreground: var(--fg);
+  --color-destructive: var(--rust);
+  --color-border: var(--border);
+  --color-input: var(--border);
+  --color-ring: var(--muted);
+  --radius-md: 6px;
+}
+
+/* shadcn's base rule: borders default to the border token, not currentColor. */
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-border);
+  }
+}
+
 :root {
   /* Follows the system theme until the reader picks one with the theme toggle
      (ThemeToggle.tsx), which sets data-theme on <html>. */
@@ -43,6 +88,18 @@ main {
   margin: 0 auto;
   padding: 48px 16px 64px;
 }
+h1,
+h2,
+h3 {
+  font-weight: 700;
+}
+p {
+  margin: 1em 0;
+}
+ul {
+  list-style: disc;
+  padding-left: 40px;
+}
 h1 {
   font-size: 2.2rem;
   line-height: 1.2;
@@ -63,24 +120,6 @@ h3 {
   color: var(--muted);
   font-size: 1.1rem;
   margin: 0 0 12px;
-}
-.theme-toggle {
-  position: fixed;
-  top: 12px;
-  right: 16px;
-  font:
-    500 0.8rem system-ui,
-    sans-serif;
-  color: var(--fg);
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 6px 12px;
-  cursor: pointer;
-  transition: border-color 0.15s;
-}
-.theme-toggle:hover {
-  border-color: var(--muted);
 }
 .links {
   display: flex;
@@ -264,28 +303,6 @@ tbody tr:hover {
   min-width: 0;
   overflow-wrap: break-word;
 }
-.copy {
-  font:
-    500 0.78rem system-ui,
-    sans-serif;
-  color: var(--fg);
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 5px 10px;
-  min-width: 66px;
-  cursor: pointer;
-  transition:
-    border-color 0.15s,
-    color 0.15s;
-}
-.copy:hover {
-  border-color: var(--muted);
-}
-.copy.done {
-  border-color: var(--go);
-  color: var(--go);
-}
 .note {
   color: var(--muted);
   font-size: 0.95rem;
@@ -399,9 +416,6 @@ details .scroll {
   margin-top: 10px;
   font-size: 0.85rem;
   color: var(--muted);
-}
-.live-bar .copy {
-  min-width: 76px;
 }
 .live-bar .stats {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -546,17 +560,6 @@ figure.diagram .series {
 .lru-status {
   min-width: 0;
 }
-.copy:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-.live-bar .copy[aria-pressed="true"] {
-  border-color: var(--muted);
-}
-.live-bar .copy:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
 .controls {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -564,41 +567,4 @@ figure.diagram .series {
   margin-top: 12px;
   font-size: 0.85rem;
   color: var(--muted);
-}
-.slider {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 2px 8px;
-}
-.slider input {
-  grid-column: 1 / -1;
-  grid-row: 2;
-  width: 100%;
-  accent-color: var(--fg);
-}
-.layout {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 12px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-.layout legend {
-  width: 100%;
-  padding: 0;
-  margin-bottom: 2px;
-}
-.layout label {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--fg);
-}
-.layout input {
-  accent-color: var(--fg);
-}
-.slider output {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  color: var(--fg);
 }

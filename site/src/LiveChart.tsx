@@ -3,7 +3,10 @@
 // either language, force a Go collection and change the experiment mid-run
 // (issue #19), including Go's pointer-free layout (issue #20).
 
-import { createSignal, For, onCleanup, Show, type JSX } from "solid-js";
+import { useEffect, useRef, useState, type JSX } from "react";
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { BOX, niceMax, polyline, xAt, yAt, type Scale } from "./chart.ts";
 import {
   TimeWindow,
@@ -36,8 +39,8 @@ function fmt(ms: number): string {
 type Phase = "loading" | "filling" | "running";
 
 interface Run {
-  worker: Worker;
-  window: TimeWindow;
+  readonly worker: Worker;
+  readonly window: TimeWindow;
   phase: Phase;
 }
 
@@ -47,81 +50,89 @@ function latest(run: Run): string {
   return `${fmt(s.ms)} ms`;
 }
 
-/** A range input over a fixed list of values: the label follows the drag, `onCommit` fires on release. */
-function Slider(props: {
+/** A slider over a fixed list of values: the label follows the drag, `onCommit` fires on release. */
+function Choice(props: {
   name: string;
   values: readonly number[];
   value: number;
   format: (v: number) => string;
   onCommit: (v: number) => void;
 }): JSX.Element {
-  const [shown, setShown] = createSignal<number>();
-  const at = (e: Event): number | undefined => {
-    const el = e.currentTarget;
-    return el instanceof HTMLInputElement ? props.values[Number(el.value)] : undefined;
-  };
-  const value = (): number => shown() ?? props.value;
+  const [shown, setShown] = useState<number>();
+  const text = props.format(shown ?? props.value);
   return (
-    <label class="slider">
+    <div className="slider grid grid-cols-[1fr_auto] gap-x-2 gap-y-1.5">
       <span>{props.name}</span>
-      <input
-        type="range"
-        min="0"
+      <output className="font-mono text-foreground">{text}</output>
+      <Slider
+        className="col-span-2"
+        min={0}
         max={props.values.length - 1}
-        step="1"
-        value={props.values.indexOf(props.value)}
-        aria-valuetext={props.format(value())}
-        onInput={(e) => {
-          setShown(at(e));
+        step={1}
+        value={[shown === undefined ? props.values.indexOf(props.value) : props.values.indexOf(shown)]}
+        aria-label={props.name}
+        aria-valuetext={text}
+        onValueChange={([i]) => {
+          setShown(props.values[i ?? -1]);
         }}
-        onChange={(e) => {
-          const v = at(e);
+        onValueCommit={([i]) => {
+          const v = props.values[i ?? -1];
           setShown(undefined);
           if (v !== undefined) props.onCommit(v);
         }}
       />
-      <output>{props.format(value())}</output>
-    </label>
+    </div>
   );
 }
 
+function isLayout(v: string): v is GoLayout {
+  return LAYOUTS.some((l) => l.value === v);
+}
+
 export function LiveChart(): JSX.Element {
-  const [runs, setRuns] = createSignal<Partial<Record<Lang, Run>>>({});
-  const [settings, setSettings] = createSignal<Settings>(DEFAULTS);
-  // Bumped once per animation frame after new samples, so the chart redraws
-  // at most once a frame however fast the workers post.
-  const [frame, setFrame] = createSignal(0);
-  const [status, setStatus] = createSignal("Not running. Each language uses a CPU core while it runs.");
+  // The runs live in a ref, not state: the workers' handlers outlive any one
+  // render and must see the current runs. `rerender` shows a change now;
+  // `redraw` batches the stream of samples into one render per frame.
+  const runs = useRef<Partial<Record<Lang, Run>>>({});
+  const [, setFrame] = useState(0);
+  const [settings, setSettings] = useState<Settings>(DEFAULTS);
+  const [status, setStatus] = useState("Not running. Each language uses a CPU core while it runs.");
   // The last run to fail; shown ahead of any run still going.
-  const [failure, setFailure] = createSignal<string>();
-  let pending = 0;
+  const [failure, setFailure] = useState<string>();
+  const pending = useRef(0);
+
+  const rerender = (): void => {
+    setFrame((n) => n + 1);
+  };
 
   const redraw = (): void => {
-    pending ||= requestAnimationFrame(() => {
-      pending = 0;
-      setFrame((n) => n + 1);
+    pending.current ||= requestAnimationFrame(() => {
+      pending.current = 0;
+      rerender();
     });
   };
 
   const send = (lang: Lang, req: WorkerRequest): void => {
-    runs()[lang]?.worker.postMessage(req);
+    runs.current[lang]?.worker.postMessage(req);
   };
 
   const stop = (lang: Lang): void => {
-    runs()[lang]?.worker.terminate();
-    const { [lang]: _, ...rest } = runs();
-    setRuns(rest);
+    runs.current[lang]?.worker.terminate();
+    const { [lang]: _, ...rest } = runs.current;
+    runs.current = rest;
     if (Object.keys(rest).length === 0) {
-      cancelAnimationFrame(pending);
-      pending = 0;
+      cancelAnimationFrame(pending.current);
+      pending.current = 0;
       setStatus("Stopped.");
     }
-    redraw();
+    rerender();
   };
 
   const setPhase = (lang: Lang, phase: Phase): void => {
-    const run = runs()[lang];
-    if (run !== undefined) setRuns({ ...runs(), [lang]: { ...run, phase } });
+    const run = runs.current[lang];
+    if (run === undefined) return;
+    run.phase = phase;
+    rerender();
   };
 
   const start = (lang: Lang): void => {
@@ -138,7 +149,7 @@ export function LiveChart(): JSX.Element {
           setPhase(lang, "running");
           return;
         case "error": {
-          const verb = runs()[lang]?.phase === "loading" ? "failed to start" : "stopped";
+          const verb = runs.current[lang]?.phase === "loading" ? "failed to start" : "stopped";
           stop(lang);
           setFailure(`${NAMES[lang]} ${verb}: ${msg.error}`);
           return;
@@ -149,174 +160,170 @@ export function LiveChart(): JSX.Element {
       }
     });
     setFailure(undefined);
-    setRuns({ ...runs(), [lang]: { worker, window: samples, phase: "loading" } });
-    send(lang, { kind: "start", lang, settings: settings() });
+    runs.current = { ...runs.current, [lang]: { worker, window: samples, phase: "loading" } };
+    send(lang, { kind: "start", lang, settings });
+    rerender();
   };
 
   const change = (next: Partial<Settings>): void => {
-    setSettings({ ...settings(), ...next });
-    for (const lang of LANGS) send(lang, { kind: "settings", settings: settings() });
+    const s = { ...settings, ...next };
+    setSettings(s);
+    for (const lang of LANGS) send(lang, { kind: "settings", settings: s });
   };
 
-  onCleanup(() => {
-    for (const lang of LANGS) stop(lang);
+  useEffect(
+    () => (): void => {
+      for (const run of Object.values(runs.current)) run.worker.terminate();
+      cancelAnimationFrame(pending.current);
+    },
+    [],
+  );
+
+  const windows: Partial<Record<Lang, TimeWindow>> = {};
+  for (const lang of LANGS) {
+    const w = runs.current[lang]?.window;
+    if (w !== undefined) windows[lang] = w;
+  }
+  const all = Object.values(windows);
+  const t1 = Math.max(...all.map((w) => w.end));
+  const scale: Scale | undefined =
+    all.length === 0 ? undefined : { t0: t1 - SPAN_MS, t1, yMax: niceMax(Math.max(...all.map((w) => w.max()))) };
+
+  const parts = LANGS.flatMap((lang) => {
+    const run = runs.current[lang];
+    return run === undefined ? [] : [`${NAMES[lang]} ${latest(run)}`];
   });
-
-  // Everything below reads frame() so it recomputes on each redraw.
-  const view = (): { scale: Scale; windows: Partial<Record<Lang, TimeWindow>> } | undefined => {
-    frame();
-    const windows: Partial<Record<Lang, TimeWindow>> = {};
-    for (const lang of LANGS) {
-      const w = runs()[lang]?.window;
-      if (w !== undefined) windows[lang] = w;
-    }
-    const all = Object.values(windows);
-    if (all.length === 0) return undefined;
-    const t1 = Math.max(...all.map((w) => w.end));
-    return { scale: { t0: t1 - SPAN_MS, t1, yMax: niceMax(Math.max(...all.map((w) => w.max()))) }, windows };
-  };
-
-  const stats = (): string => {
-    frame();
-    const parts = LANGS.flatMap((lang) => {
-      const run = runs()[lang];
-      return run === undefined ? [] : [`${NAMES[lang]} ${latest(run)}`];
-    });
-    const go = runs().go;
-    if (go !== undefined) parts.push(`${String(go.window.gcCount())} Go GCs in view`);
-    const fail = failure();
-    if (fail !== undefined) parts.unshift(fail);
-    return parts.length === 0 ? status() : parts.join(" · ");
-  };
+  const go = runs.current.go;
+  if (go !== undefined) parts.push(`${String(go.window.gcCount())} Go GCs in view`);
+  if (failure !== undefined) parts.unshift(failure);
+  const stats = parts.length === 0 ? status : parts.join(" · ");
 
   return (
     <>
-      <div class="plot">
+      <div className="plot">
         <svg viewBox="0 0 680 250" role="img" aria-label="Live per-batch latency for Go and Rust">
-          <Show when={view()}>
-            {(v) => (
-              <>
-                <For each={[0, 0.5, 1]}>
-                  {(f) => {
-                    const y = (): number => yAt(f * v().scale.yMax, v().scale, BOX);
-                    return (
-                      <>
-                        <line x1={BOX.left} x2={BOX.left + BOX.width} y1={y()} y2={y()} stroke="var(--border)" />
-                        <text x={BOX.left - 8} y={y() + 4} text-anchor="end">
-                          {`${fmt(f * v().scale.yMax)} ms`}
-                        </text>
-                      </>
-                    );
-                  }}
-                </For>
-                <g class="gc">
-                  <For each={(v().windows.go?.samples ?? []).filter((s) => s.gc !== undefined && s.t >= v().scale.t0)}>
-                    {(s) => (
-                      <line
-                        x1={xAt(s.t, v().scale, BOX)}
-                        x2={xAt(s.t, v().scale, BOX)}
-                        y1={BOX.top - 4}
-                        y2={BOX.top + BOX.height}
-                      />
-                    )}
-                  </For>
-                </g>
-                <For each={LANGS}>
-                  {(lang) => (
-                    <polyline
-                      class={`${lang}-line`}
-                      fill="none"
-                      stroke-width="2"
-                      stroke-linejoin="round"
-                      stroke={`var(--${lang}-fill)`}
-                      points={polyline(
-                        (v().windows[lang]?.samples ?? []).map((s) => ({ t: s.t, v: s.ms })),
-                        v().scale,
-                        BOX,
-                      )}
+          {scale !== undefined && (
+            <>
+              {[0, 0.5, 1].map((f) => {
+                const y = yAt(f * scale.yMax, scale, BOX);
+                return (
+                  <g key={f}>
+                    <line x1={BOX.left} x2={BOX.left + BOX.width} y1={y} y2={y} stroke="var(--border)" />
+                    <text x={BOX.left - 8} y={y + 4} textAnchor="end">
+                      {`${fmt(f * scale.yMax)} ms`}
+                    </text>
+                  </g>
+                );
+              })}
+              <g className="gc">
+                {(windows.go?.samples ?? [])
+                  .filter((s) => s.gc !== undefined && s.t >= scale.t0)
+                  .map((s) => (
+                    <line
+                      key={s.t}
+                      x1={xAt(s.t, scale, BOX)}
+                      x2={xAt(s.t, scale, BOX)}
+                      y1={BOX.top - 4}
+                      y2={BOX.top + BOX.height}
                     />
+                  ))}
+              </g>
+              {LANGS.map((lang) => (
+                <polyline
+                  key={lang}
+                  className={`${lang}-line`}
+                  fill="none"
+                  strokeWidth="2"
+                  strokeLinejoin="round"
+                  stroke={`var(--${lang}-fill)`}
+                  points={polyline(
+                    (windows[lang]?.samples ?? []).map((s) => ({ t: s.t, v: s.ms })),
+                    scale,
+                    BOX,
                   )}
-                </For>
-              </>
-            )}
-          </Show>
+                />
+              ))}
+            </>
+          )}
         </svg>
       </div>
-      <div class="live-bar">
-        <For each={LANGS}>
-          {(lang) => (
-            <button
-              class={`copy run-${lang}`}
-              type="button"
-              aria-pressed={runs()[lang] !== undefined}
-              onClick={() => {
-                if (runs()[lang] === undefined) start(lang);
-                else stop(lang);
-              }}
-            >
-              {`${runs()[lang] === undefined ? "Run" : "Stop"} ${NAMES[lang]}`}
-            </button>
-          )}
-        </For>
-        <button
-          class="copy force-gc"
-          type="button"
-          disabled={runs().go?.phase !== "running"}
+      <div className="live-bar">
+        {LANGS.map((lang) => (
+          <Button
+            key={lang}
+            variant="outline"
+            size="sm"
+            className={`run-${lang} min-w-19 aria-pressed:border-muted-foreground`}
+            aria-pressed={runs.current[lang] !== undefined}
+            onClick={() => {
+              if (runs.current[lang] === undefined) start(lang);
+              else stop(lang);
+            }}
+          >
+            {`${runs.current[lang] === undefined ? "Run" : "Stop"} ${NAMES[lang]}`}
+          </Button>
+        ))}
+        <Button
+          variant="outline"
+          size="sm"
+          className="force-gc min-w-19"
+          disabled={go?.phase !== "running"}
           onClick={() => {
             send("go", { kind: "gc" });
           }}
         >
           Force GC
-        </button>
-        <span class="stats">{stats()}</span>
+        </Button>
+        <span className="stats">{stats}</span>
       </div>
-      <div class="controls">
-        <Slider
+      <div className="controls">
+        <Choice
           name="Cache size"
           values={CAPACITIES}
-          value={settings().capacity}
+          value={settings.capacity}
           format={(n) => `${formatCount(n)} entries`}
           onCommit={(capacity) => {
             change({ capacity });
           }}
         />
-        <Slider
+        <Choice
           name="Batch size"
           values={BATCHES}
-          value={settings().batch}
+          value={settings.batch}
           format={(n) => `${formatCount(n)} ops`}
           onCommit={(batch) => {
             change({ batch });
           }}
         />
-        <Slider
+        <Choice
           name="Read ratio"
           values={READ_PCTS}
-          value={settings().readPct}
+          value={settings.readPct}
           format={(n) => `${String(n)}% reads`}
           onCommit={(readPct) => {
             change({ readPct });
           }}
         />
-        <fieldset class="layout">
-          <legend>Go layout</legend>
-          <For each={LAYOUTS}>
-            {(l) => (
-              <label>
-                <input
-                  type="radio"
-                  name="go-layout"
-                  value={l.value}
-                  checked={settings().goLayout === l.value}
-                  onChange={() => {
-                    change({ goLayout: l.value });
-                  }}
-                />
+        <div className="flex flex-col gap-1.5">
+          <span id="go-layout">Go layout</span>
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            aria-labelledby="go-layout"
+            value={settings.goLayout}
+            onValueChange={(v) => {
+              // Radix sends "" when the pressed item is clicked again: keep the layout.
+              if (isLayout(v)) change({ goLayout: v });
+            }}
+          >
+            {LAYOUTS.map((l) => (
+              <ToggleGroupItem key={l.value} value={l.value} data-value={l.value}>
                 {l.label}
-              </label>
-            )}
-          </For>
-        </fieldset>
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        </div>
       </div>
     </>
   );

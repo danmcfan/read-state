@@ -38,7 +38,7 @@ This needs Go, the `wasm32-unknown-unknown` Rust target (`rustup target add wasm
 
 ## Site
 
-The explainer is `site/index.html` (the article) plus SolidJS components in `site/src/` for the charts and buttons, built with Vite and run by Bun (`docs/adr/0001-site-on-vite-solid-typescript.md`). It follows the system light or dark theme, and the toggle in the corner overrides it.
+The explainer is `site/index.html` (the article) plus React components in `site/src/` for the charts and buttons, with shadcn/ui controls on Tailwind, built with Vite and run by Bun (`docs/adr/0002-site-on-react-shadcn.md`). It follows the system light or dark theme, and the toggle in the corner overrides it.
 
 ```sh
 bun install        # also installs the git hooks

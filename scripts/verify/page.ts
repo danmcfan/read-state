@@ -37,7 +37,7 @@ await verify("page", async (v) => {
       document.querySelector('#cpu-chart polyline')?.getAttribute('points')?.split(' ').length,
       [...document.querySelectorAll('#cpu-chart text')].filter((t) => t.textContent === 'forced GC').length,
       document.querySelectorAll('#cpu-table tbody tr').length,
-      document.querySelectorAll('.cmd button.copy').length,
+      document.querySelectorAll('.cmd button').length,
     ])`,
   );
   v.check(counts === "[120,4,120,2]", "120 points, 4 forced GCs, 120 table rows, 2 copy buttons", counts);

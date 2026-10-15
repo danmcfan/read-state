@@ -3,22 +3,30 @@
 // size, batch size and read ratio sliders change the run while it streams
 // (issue #19).
 
-import { verify } from "../harness.ts";
+import { verify, type Verify } from "../harness.ts";
 
 const gcLines = "document.querySelectorAll('#live-chart .gc line').length";
 const goPoints =
   "(document.querySelector('#live-chart .go-line')?.getAttribute('points') ?? '').split(' ').filter(Boolean).length";
 
-/** Set a slider to step `i` and fire the events a drag would. */
-const slide = (name: string, i: number): string => `(() => {
-  const label = [...document.querySelectorAll('#live-chart .slider')].find((l) => l.textContent?.startsWith('${name}'));
-  const input = label?.querySelector('input');
-  if (!input) return false;
-  input.value = '${String(i)}';
-  input.dispatchEvent(new Event('input', { bubbles: true }));
-  input.dispatchEvent(new Event('change', { bubbles: true }));
-  return label.querySelector('output')?.textContent;
+/** Move a slider to its first or last step with the keyboard, as a reader would. */
+const slide = (name: string, key: "Home" | "End"): string => `(() => {
+  const control = [...document.querySelectorAll('#live-chart .slider')].find((c) => c.textContent?.startsWith('${name}'));
+  const thumb = control?.querySelector('[role=slider]');
+  if (!thumb) return false;
+  thumb.dispatchEvent(new KeyboardEvent('keydown', { key: '${key}', bubbles: true }));
+  return true;
 })()`;
+
+/** The label a slider shows. */
+const label = (name: string): string =>
+  `[...document.querySelectorAll('#live-chart .slider')].find((c) => c.textContent?.startsWith('${name}'))?.querySelector('output')?.textContent`;
+
+/** Moves slider `name` to `key` and waits for its label to read `want`. */
+async function setSlider(v: Verify, name: string, key: "Home" | "End", want: string): Promise<void> {
+  v.check((await v.eval(slide(name, key))) === true, `the ${name.toLowerCase()} slider takes the keyboard`);
+  await v.until(`the ${name.toLowerCase()} slider reads ${want}`, `${label(name)} === '${want}'`, 5000);
+}
 
 const stats = "document.querySelector('#live-chart .stats')?.textContent";
 const forceGcDisabled = "document.querySelector('#live-chart .force-gc')?.disabled";
@@ -28,7 +36,7 @@ await verify("controls", async (v) => {
   v.check((await v.eval(forceGcDisabled)) === true, "Force GC is disabled until Go runs");
 
   // A small cache so Go fills quickly and collects rarely on its own.
-  v.check((await v.eval(slide("Cache size", 0))) === "100k entries", "the cache size slider reads 100k entries");
+  await setSlider(v, "Cache size", "Home", "100k entries");
   await v.click("#live-chart .run-go");
   v.check(
     /^Go (loading|filling cache)/u.test(String(await v.eval(stats))),
@@ -42,9 +50,9 @@ await verify("controls", async (v) => {
   await v.click("#live-chart .force-gc");
   await v.until("Force GC marks a collection", `${gcLines} > ${String(before)}`, 10_000);
 
-  v.check((await v.eval(slide("Batch size", 5))) === "100k ops", "the batch size slider reads 100k ops");
-  v.check((await v.eval(slide("Read ratio", 10))) === "100% reads", "the read ratio slider reads 100% reads");
-  v.check((await v.eval(slide("Cache size", 4))) === "2M entries", "the cache size slider reads 2M entries");
+  await setSlider(v, "Batch size", "End", "100k ops");
+  await setSlider(v, "Read ratio", "End", "100% reads");
+  await setSlider(v, "Cache size", "End", "2M entries");
   await v.until("a resize shows the cache refilling", `${stats}?.startsWith('Go filling cache')`, 10_000);
   await v.until("Go keeps streaming after the changes", `${goPoints} > 40`, 60_000);
   await v.screenshot("controls", "#live-chart");

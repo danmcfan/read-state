@@ -16,7 +16,7 @@ Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/ag
 
 ## Site
 
-Vite + SolidJS + strict TypeScript, run by Bun (`docs/adr/0001-site-on-vite-solid-typescript.md`). Gate: `bun run check` (`docs/agents/quality-gate.md`). Browser checks for any `site/` change: `bun run verify` (`docs/agents/verification.md`).
+Vite + React + strict TypeScript, run by Bun, with shadcn/ui components on Tailwind (`docs/adr/0002-site-on-react-shadcn.md`). Use a shadcn component (`bunx --bun shadcn@latest add <name>`) before building a control by hand. Gate: `bun run check` (`docs/agents/quality-gate.md`). Browser checks for any `site/` change: `bun run verify` (`docs/agents/verification.md`).
 
 ## Delivery
 
