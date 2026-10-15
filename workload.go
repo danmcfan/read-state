@@ -4,7 +4,7 @@ package readstate
 // SetReadRatio changes it.
 const DefaultReadRatio = 50
 
-// Layout picks the Go cache's memory layout.
+// Layout picks the Go cache's memory layout. The zero value is ListLayout.
 type Layout int
 
 const (
@@ -26,13 +26,17 @@ type Workload struct {
 }
 
 // NewWorkload returns a workload over a cache of the given capacity and
-// layout, filled with keys 0..capacity-1. The key range is capacity*5/4.
+// layout, filled with keys 0..capacity-1. The key range is capacity*5/4. It
+// panics on an unknown layout.
 func NewWorkload(capacity int, layout Layout) *Workload {
 	var c Cache
-	if layout == SlabLayout {
-		c = NewSlabCache(capacity)
-	} else {
+	switch layout {
+	case ListLayout:
 		c = NewLRUCache(capacity)
+	case SlabLayout:
+		c = NewSlabCache(capacity)
+	default:
+		panic("readstate: unknown layout")
 	}
 	for k := int64(0); k < int64(capacity); k++ {
 		c.Put(k, k)

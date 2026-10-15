@@ -184,9 +184,12 @@
       <p>
         Could Go have kept up by holding no pointers? Switch the Go layout to pointer-free and Go refills its cache as
         one slice of fixed-size slots linked by index, with a map from key to slot index, the same design as the Rust
-        cache. Neither holds a pointer, so the collector marks them as having nothing inside to scan, and a collection
-        costs about the same at 2 million entries as at 100 thousand. Pointers is Discord's original layout: a map of
-        pointers into <code>container/list</code>, where every entry is a heap object the collector must trace.
+        cache. Neither holds a pointer, so the collector marks them as having nothing inside to scan. In this WASM build
+        a forced collection of 2 million entries takes around 280 ms with pointers and about 1 ms without, the same as
+        at 100 thousand. Pointers is Discord's original layout: a map of pointers into <code>container/list</code>,
+        where every entry is a heap object the collector must trace. The comparison flatters Go a little: Discord's real
+        read states held more than two integers, and anything with a string, timer or pointer in it would put the
+        collector back to work.
       </p>
       <figure class="chart">
         <div class="head">
