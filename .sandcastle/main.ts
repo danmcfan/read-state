@@ -1,5 +1,15 @@
 import { $ } from "bun";
-import { branchFor, containers, logsFor, outcome, runIssue, STEPS, usageReport, type IssueRun } from "./pipeline.ts";
+import {
+  branchFor,
+  containers,
+  describe,
+  logsFor,
+  outcome,
+  runIssue,
+  STEPS,
+  usageReport,
+  type IssueRun,
+} from "./pipeline.ts";
 import { createTui } from "./tui.ts";
 
 // Run with `bun run sandcastle [issue-number] [--fresh]`. Needs Docker and .sandcastle/.env (copy .env.example).
@@ -59,7 +69,7 @@ try {
 } catch (error) {
   if (!stop.signal.aborted) {
     tui.fail(current, "failed");
-    tui.close([`Failed during ${current}. Logs: ${logs}/`, "", ...usageReport(runs)]);
+    tui.close([`Failed during ${current}: ${describe(error)}`, `Logs: ${logs}/`, "", ...usageReport(runs)]);
     throw error;
   }
   tui.stop(current, "stopped (Ctrl-C)");

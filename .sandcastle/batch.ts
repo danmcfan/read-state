@@ -1,5 +1,5 @@
 import { $ } from "bun";
-import { containers, logsFor, outcome, runIssue, usageReport, type IssueRun } from "./pipeline.ts";
+import { containers, describe, logsFor, outcome, runIssue, usageReport, type IssueRun } from "./pipeline.ts";
 import { createBatchTui } from "./tui.ts";
 
 // Run with `bun run sandcastle:batch [issues ...] [--fresh]`, where each argument is a number (`12`)
@@ -94,7 +94,7 @@ async function runOne(issue: string): Promise<void> {
       return;
     }
     tui.set(issue, "failed", current, "failed");
-    results.set(issue, `Failed during ${current}: ${error instanceof Error ? error.message : String(error)}`);
+    results.set(issue, `Failed during ${current}: ${describe(error)}`);
   }
 }
 
