@@ -18,6 +18,8 @@
     "test": "bun test",
     "test:native": "go vet ./... && go test ./... && cargo test --quiet",
     "verify": "bun scripts/verify.ts",
+    "sandcastle": "bun .sandcastle/main.ts",
+    "sandcastle:batch": "bun .sandcastle/batch.ts",
     "check": "bun run typecheck && bun run lint && bun run format:check && bun run lint:native && bun run knip && bun test && bun run build && bun run test:native"
   },
   "dependencies": {
@@ -29,6 +31,7 @@
     "tailwind-merge": "3.7.0"
   },
   "devDependencies": {
+    "@ai-hero/sandcastle": "0.12.0",
     "@tailwindcss/vite": "4.3.3",
     "@types/bun": "1.4.2",
     "@types/react": "19.3.0",
