@@ -174,12 +174,9 @@
 
       <h2 id="live"><a class="anchor" href="#live" aria-label="Link to this section">#</a>Watch it live</h2>
       <p>
-        The same cache, compiled to WebAssembly, can run right here in your browser. Press Run Go or Run Rust (or both)
-        to run the <span class="go">Go</span> and <span class="rust">Rust</span> builds, each in its own worker. Every
-        point is one batch of reads and writes to a full cache, run back to back; dashed lines mark Go garbage
-        collections. Then experiment: Force GC runs a Go collection now, a bigger cache gives the collector more to scan
-        on each pass, a bigger batch makes each point longer, and more reads mean fewer writes, so less new memory for
-        Go to collect. At 100% reads, nothing changes in the cache at all.
+        The same cache, compiled to WebAssembly, runs right here in your browser: the <span class="go">Go</span> and
+        <span class="rust">Rust</span> builds, each in its own worker. Every point is one batch of reads and writes to a
+        full cache, run back to back; dashed lines mark Go garbage collections.
       </p>
       <figure class="chart">
         <div class="head">
@@ -198,6 +195,29 @@
           spikes when a collection runs.
         </figcaption>
       </figure>
+
+      <h3>Try this</h3>
+      <ul class="try-this">
+        <li>Press <strong>Run Go</strong> and watch for its spikes: each one sits on a dashed line, a collection.</li>
+        <li>
+          Press <strong>Run Rust</strong> beside it and see a flat line: Rust frees memory as it goes, with nothing to
+          collect.
+        </li>
+        <li>Press <strong>Force GC</strong> while Go runs and watch for a spike on a new dashed line.</li>
+        <li>
+          Raise the <strong>Cache size</strong> and see Go's spikes grow taller: each collection has more entries to
+          scan.
+        </li>
+        <li><strong>Batch size</strong> sets the work per point: raise it and see both lines climb together.</li>
+        <li>
+          Push the <strong>Read ratio</strong> to 100% and watch Go's collections stop: with no writes, nothing in the
+          cache changes and nothing new needs collecting.
+        </li>
+        <li>
+          Switch the <strong>Go layout</strong> to Pointer-free and see Go's spikes shrink to Rust's size;
+          <a href="#pointer-free">the next section</a> explains why.
+        </li>
+      </ul>
 
       <h2 id="pointer-free">
         <a class="anchor" href="#pointer-free" aria-label="Link to this section">#</a>Could Go keep up without pointers?
