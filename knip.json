@@ -3,6 +3,6 @@
   "entry": ["scripts/*.ts", "scripts/verify/*.ts"],
   "project": ["site/src/**/*.{ts,tsx}", "scripts/**/*.ts", ".sandcastle/*.ts"],
   "ignoreExportsUsedInFile": true,
-  "ignoreDependencies": ["tailwindcss"],
+  "ignoreDependencies": ["tailwindcss", "@standard-schema/spec"],
   "ignoreBinaries": ["go", "golangci-lint"]
 }

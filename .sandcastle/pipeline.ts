@@ -241,6 +241,12 @@ export function outcome(progress: Progress): string {
   return progress.green === true ? "PR" : "Draft PR (check failing)";
 }
 
+/** An error's message, with a failed shell command's stderr (a push hook's or gh's reason) appended. */
+export function describe(error: unknown): string {
+  if (error instanceof $.ShellError) return `${error.message}\n${error.stderr.toString().trim()}`;
+  return error instanceof Error ? error.message : String(error);
+}
+
 const asError = (reason: unknown): Error => (reason instanceof Error ? reason : new Error("Interrupted"));
 
 export function containers(): string[] {

@@ -7,3 +7,4 @@ Cargo.lock
 *.go
 *.rs
 .sandcastle/logs
+.sandcastle/worktrees
