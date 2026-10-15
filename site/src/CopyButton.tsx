@@ -1,5 +1,6 @@
 import { useState, type JSX } from "react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 /** Copies `text`; if the clipboard is blocked, selects `fallback` so the reader can copy it by hand. */
 export function CopyButton(props: { text: string; fallback: Node }): JSX.Element {
@@ -21,7 +22,7 @@ export function CopyButton(props: { text: string; fallback: Node }): JSX.Element
   };
 
   return (
-    <Button variant="outline" size="sm" className="min-w-16" onClick={() => void copy()}>
+    <Button variant="outline" size="sm" className={cn("min-w-16", { "copy-done": done })} onClick={() => void copy()}>
       {done ? "Copied" : "Copy"}
     </Button>
   );

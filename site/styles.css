@@ -303,6 +303,11 @@ tbody tr:hover {
   min-width: 0;
   overflow-wrap: break-word;
 }
+/* CopyButton's success state, in the Go accent. */
+.copy-done {
+  border-color: var(--go);
+  color: var(--go);
+}
 .note {
   color: var(--muted);
   font-size: 0.95rem;

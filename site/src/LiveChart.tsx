@@ -73,10 +73,10 @@ function Choice(props: {
         aria-label={props.name}
         aria-valuetext={text}
         onValueChange={([i]) => {
-          setShown(props.values[i ?? -1]);
+          setShown(i === undefined ? undefined : props.values[i]);
         }}
         onValueCommit={([i]) => {
-          const v = props.values[i ?? -1];
+          const v = i === undefined ? undefined : props.values[i];
           setShown(undefined);
           if (v !== undefined) props.onCommit(v);
         }}
@@ -96,6 +96,8 @@ export function LiveChart(): JSX.Element {
   const runs = useRef<Partial<Record<Lang, Run>>>({});
   const [, setFrame] = useState(0);
   const [settings, setSettings] = useState<Settings>(DEFAULTS);
+  // The latest settings, for changes that land before React renders the last one.
+  const latestSettings = useRef(DEFAULTS);
   const [status, setStatus] = useState("Not running. Each language uses a CPU core while it runs.");
   // The last run to fail; shown ahead of any run still going.
   const [failure, setFailure] = useState<string>();
@@ -161,12 +163,13 @@ export function LiveChart(): JSX.Element {
     });
     setFailure(undefined);
     runs.current = { ...runs.current, [lang]: { worker, window: samples, phase: "loading" } };
-    send(lang, { kind: "start", lang, settings });
+    send(lang, { kind: "start", lang, settings: latestSettings.current });
     rerender();
   };
 
   const change = (next: Partial<Settings>): void => {
-    const s = { ...settings, ...next };
+    const s = { ...latestSettings.current, ...next };
+    latestSettings.current = s;
     setSettings(s);
     for (const lang of LANGS) send(lang, { kind: "settings", settings: s });
   };
