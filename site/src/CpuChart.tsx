@@ -1,7 +1,8 @@
 // The recorded 10-minute CPU run (cpu-run.json): a chart with a hover
 // readout, and the same data as a table.
 
-import { createSignal, For, onCleanup, onMount, Show, type JSX } from "solid-js";
+import { useEffect, useRef, useState, type JSX, type PointerEvent } from "react";
+import { cn } from "@/lib/utils";
 import { BOX, polyline, xAt, yAt, type Scale } from "./chart.ts";
 import run from "./cpu-run.json";
 
@@ -33,13 +34,12 @@ const LABEL =
   "about every two minutes. Rust stays between about 30 and 70 percent with no spikes.";
 
 export function CpuChart(): JSX.Element {
-  const [hover, setHover] = createSignal<{ i: number; left: number; top: number }>();
-  const [drawn, setDrawn] = createSignal(false);
-  let plot: HTMLDivElement | undefined;
-  let svg: SVGSVGElement | undefined;
+  const [hover, setHover] = useState<{ i: number; left: number; top: number }>();
+  const [drawn, setDrawn] = useState(false);
+  const plot = useRef<HTMLDivElement>(null);
+  const svg = useRef<SVGSVGElement>(null);
 
-  onMount(() => {
-    if (plot === undefined) return;
+  useEffect(() => {
     const io = new IntersectionObserver(
       (entries) => {
         if (entries.some((e) => e.isIntersecting)) {
@@ -49,87 +49,65 @@ export function CpuChart(): JSX.Element {
       },
       { threshold: 0.4 },
     );
-    io.observe(plot);
-    onCleanup(() => {
+    if (plot.current !== null) io.observe(plot.current);
+    return (): void => {
       io.disconnect();
-    });
-  });
+    };
+  }, []);
 
-  const move = (e: PointerEvent): void => {
-    const ctm = svg?.getScreenCTM();
-    if (svg === undefined || plot === undefined || ctm === null || ctm === undefined) return;
+  const move = (e: PointerEvent<SVGRectElement>): void => {
+    const ctm = svg.current?.getScreenCTM();
+    const el = plot.current;
+    if (el === null || ctm === null || ctm === undefined) return;
     const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(ctm.inverse());
     const t = ((p.x - BOX.left) / BOX.width) * SCALE.t1;
-    const box = plot.getBoundingClientRect();
-    let left = e.clientX - box.left + plot.scrollLeft + 12;
-    if (left + 110 > plot.scrollLeft + box.width) left -= 130;
+    const box = el.getBoundingClientRect();
+    let left = e.clientX - box.left + el.scrollLeft + 12;
+    if (left + 110 > el.scrollLeft + box.width) left -= 130;
     setHover({ i: nearest(t), left, top: e.clientY - box.top + 12 });
   };
 
+  const hoverX = hover === undefined ? 0 : xAt(run.t[hover.i] ?? 0, SCALE, BOX);
+
   return (
-    <div
-      class="plot"
-      classList={{ draw: drawn() }}
-      ref={(el) => {
-        plot = el;
-      }}
-    >
-      <svg
-        viewBox="0 0 680 250"
-        role="img"
-        aria-label={LABEL}
-        ref={(el) => {
-          svg = el;
-        }}
-      >
-        <For each={[0, 50, 100, 150, 200]}>
-          {(v) => (
-            <>
-              <line
-                x1={BOX.left}
-                x2={BOX.left + BOX.width}
-                y1={yAt(v, SCALE, BOX)}
-                y2={yAt(v, SCALE, BOX)}
-                stroke="var(--border)"
-              />
-              <text x={36} y={yAt(v, SCALE, BOX) + 4} text-anchor="end">{`${String(v)}%`}</text>
-            </>
-          )}
-        </For>
-        <For each={[0, 2, 4, 6, 8, 10]}>
-          {(min) => <text x={xAt(min * 60, SCALE, BOX)} y={240} text-anchor="middle">{`${String(min)} min`}</text>}
-        </For>
-        <For each={run.forcedGcSeconds}>
-          {(t) => (
-            <>
-              <line
-                x1={xAt(t, SCALE, BOX)}
-                x2={xAt(t, SCALE, BOX)}
-                y1={18}
-                y2={BOX.top + BOX.height}
-                stroke="var(--muted)"
-                stroke-dasharray="3 4"
-              />
-              <text x={xAt(t, SCALE, BOX)} y={14} text-anchor="middle">
-                forced GC
-              </text>
-            </>
-          )}
-        </For>
-        <For each={series}>
-          {(s) => <polyline class="line" pathLength={1} stroke={s.color} points={points(s.values)} />}
-        </For>
-        <Show when={hover()}>
-          {(h) => (
+    <div className={cn("plot", { draw: drawn })} ref={plot}>
+      <svg viewBox="0 0 680 250" role="img" aria-label={LABEL} ref={svg}>
+        {[0, 50, 100, 150, 200].map((v) => (
+          <g key={v}>
             <line
-              x1={xAt(run.t[h().i] ?? 0, SCALE, BOX)}
-              x2={xAt(run.t[h().i] ?? 0, SCALE, BOX)}
-              y1={BOX.top}
+              x1={BOX.left}
+              x2={BOX.left + BOX.width}
+              y1={yAt(v, SCALE, BOX)}
+              y2={yAt(v, SCALE, BOX)}
+              stroke="var(--border)"
+            />
+            <text x={36} y={yAt(v, SCALE, BOX) + 4} textAnchor="end">{`${String(v)}%`}</text>
+          </g>
+        ))}
+        {[0, 2, 4, 6, 8, 10].map((min) => (
+          <text key={min} x={xAt(min * 60, SCALE, BOX)} y={240} textAnchor="middle">{`${String(min)} min`}</text>
+        ))}
+        {run.forcedGcSeconds.map((t) => (
+          <g key={t}>
+            <line
+              x1={xAt(t, SCALE, BOX)}
+              x2={xAt(t, SCALE, BOX)}
+              y1={18}
               y2={BOX.top + BOX.height}
               stroke="var(--muted)"
+              strokeDasharray="3 4"
             />
-          )}
-        </Show>
+            <text x={xAt(t, SCALE, BOX)} y={14} textAnchor="middle">
+              forced GC
+            </text>
+          </g>
+        ))}
+        {series.map((s) => (
+          <polyline key={s.name} className="line" pathLength={1} stroke={s.color} points={points(s.values)} />
+        ))}
+        {hover !== undefined && (
+          <line x1={hoverX} x2={hoverX} y1={BOX.top} y2={BOX.top + BOX.height} stroke="var(--muted)" />
+        )}
         <rect
           x={BOX.left}
           y={BOX.top}
@@ -142,17 +120,15 @@ export function CpuChart(): JSX.Element {
           }}
         />
       </svg>
-      <Show when={hover()}>
-        {(h) => (
-          <div class="tip" style={{ left: `${String(h().left)}px`, top: `${String(h().top)}px` }}>
-            <b>{clock(run.t[h().i] ?? 0)}</b>
-            <br />
-            Go {run.go[h().i]}%
-            <br />
-            Rust {run.rust[h().i]}%
-          </div>
-        )}
-      </Show>
+      {hover !== undefined && (
+        <div className="tip" style={{ left: `${String(hover.left)}px`, top: `${String(hover.top)}px` }}>
+          <b>{clock(run.t[hover.i] ?? 0)}</b>
+          <br />
+          Go {run.go[hover.i]}%
+          <br />
+          Rust {run.rust[hover.i]}%
+        </div>
+      )}
     </div>
   );
 }
@@ -161,7 +137,7 @@ export function CpuTable(): JSX.Element {
   return (
     <details>
       <summary>Show the data as a table</summary>
-      <div class="scroll">
+      <div className="scroll">
         <table>
           <thead>
             <tr>
@@ -171,15 +147,13 @@ export function CpuTable(): JSX.Element {
             </tr>
           </thead>
           <tbody>
-            <For each={run.t}>
-              {(t, i) => (
-                <tr>
-                  <td>{t}</td>
-                  <td>{run.go[i()]}%</td>
-                  <td>{run.rust[i()]}%</td>
-                </tr>
-              )}
-            </For>
+            {run.t.map((t, i) => (
+              <tr key={t}>
+                <td>{t}</td>
+                <td>{run.go[i]}%</td>
+                <td>{run.rust[i]}%</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>

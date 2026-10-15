@@ -6,7 +6,7 @@ import { verify } from "../harness.ts";
 const goPoints =
   "(document.querySelector('#live-chart .go-line')?.getAttribute('points') ?? '').split(' ').filter(Boolean).length";
 const stats = "document.querySelector('#live-chart .stats')?.textContent";
-const checked = "document.querySelector('#live-chart input[name=go-layout]:checked')?.value";
+const checked = "document.querySelector('#live-chart [data-value][data-state=on]')?.dataset.value";
 
 await verify("layout", async (v) => {
   await v.open();
@@ -16,7 +16,7 @@ await verify("layout", async (v) => {
   await v.until("Go streams samples on the pointer layout", `${goPoints} > 20`, 60_000);
   await v.screenshot("pointers", "#live-chart");
 
-  await v.click("#live-chart input[value=slab]");
+  await v.click("#live-chart [data-value=slab]");
   v.check((await v.eval(checked)) === "slab", "the pointer-free option is selected");
   await v.until("switching layout refills Go's cache", `${stats}?.startsWith('Go filling cache')`, 10_000);
   await v.until("Go streams on the pointer-free layout", `${stats}?.startsWith('Go ') && /ms/u.test(${stats})`, 60_000);

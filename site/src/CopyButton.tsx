@@ -1,8 +1,10 @@
-import { createSignal, type JSX } from "solid-js";
+import { useState, type JSX } from "react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 /** Copies `text`; if the clipboard is blocked, selects `fallback` so the reader can copy it by hand. */
 export function CopyButton(props: { text: string; fallback: Node }): JSX.Element {
-  const [done, setDone] = createSignal(false);
+  const [done, setDone] = useState(false);
 
   const copy = async (): Promise<void> => {
     try {
@@ -20,8 +22,8 @@ export function CopyButton(props: { text: string; fallback: Node }): JSX.Element
   };
 
   return (
-    <button class="copy" classList={{ done: done() }} type="button" onClick={() => void copy()}>
-      {done() ? "Copied" : "Copy"}
-    </button>
+    <Button variant="outline" size="sm" className={cn("min-w-16", { "copy-done": done })} onClick={() => void copy()}>
+      {done ? "Copied" : "Copy"}
+    </Button>
   );
 }

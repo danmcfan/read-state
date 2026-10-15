@@ -1,5 +1,7 @@
 # 0001: The site is built with Vite, SolidJS and strict TypeScript, run by Bun
 
+> **Superseded in part** by [0002](0002-site-on-react-shadcn.md): the components now use React and shadcn/ui. Bun, Vite and strict TypeScript stand.
+
 ## Context
 
 The site started as one static `site/index.html` with inline scripts and a pre-rendered chart. The live latency chart (#17) added Web Workers and the WASM builds, and the explainer (#11) still has to add an article walkthrough (#18) and experiment controls (#19). Untyped inline scripts gave no check before a browser run.
