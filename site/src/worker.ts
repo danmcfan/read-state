@@ -66,6 +66,7 @@ async function start(lang: Lang, first: Settings): Promise<void> {
   guard(() => {
     const settings = current ?? first;
     cache.setReadRatio(settings.readPct);
+    cache.setLayout?.(settings.goLayout);
     fill(cache, settings.capacity);
     loaded = cache;
     loop(cache, cache.heapStats?.());
@@ -81,7 +82,9 @@ function update(next: Settings): void {
   const changes = settingsChanges(prev, next);
   guard(() => {
     if (changes.readRatio) cache.setReadRatio(next.readPct);
-    if (changes.init) fill(cache, next.capacity);
+    const relayout = changes.layout && cache.setLayout !== undefined;
+    if (relayout) cache.setLayout?.(next.goLayout);
+    if (changes.init || relayout) fill(cache, next.capacity);
   });
 }
 

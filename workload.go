@@ -4,6 +4,16 @@ package readstate
 // SetReadRatio changes it.
 const DefaultReadRatio = 50
 
+// Layout picks the Go cache's memory layout.
+type Layout int
+
+const (
+	// ListLayout is LRUCache: Discord's map of pointers into a linked list.
+	ListLayout Layout = iota
+	// SlabLayout is SlabCache: pointer-free, so the collector has nothing to scan.
+	SlabLayout
+)
+
 // Workload drives a pre-filled cache with random operations over a key range
 // a quarter larger than the capacity, so a steady share of operations miss.
 // Each operation picks a random key and either Gets it (a read) or Puts it (a
@@ -15,10 +25,15 @@ type Workload struct {
 	read  uint64 // percent of operations that are reads, 0..100
 }
 
-// NewWorkload returns a workload over a cache of the given capacity, filled
-// with keys 0..capacity-1. The key range is capacity*5/4.
-func NewWorkload(capacity int) *Workload {
-	c := NewLRUCache(capacity)
+// NewWorkload returns a workload over a cache of the given capacity and
+// layout, filled with keys 0..capacity-1. The key range is capacity*5/4.
+func NewWorkload(capacity int, layout Layout) *Workload {
+	var c Cache
+	if layout == SlabLayout {
+		c = NewSlabCache(capacity)
+	} else {
+		c = NewLRUCache(capacity)
+	}
 	for k := int64(0); k < int64(capacity); k++ {
 		c.Put(k, k)
 	}

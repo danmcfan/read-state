@@ -3,7 +3,7 @@ package readstate
 import "testing"
 
 func TestWorkloadPrefillsToCapacity(t *testing.T) {
-	w := NewWorkload(1000)
+	w := NewWorkload(1000, ListLayout)
 	if got := w.Cache().Len(); got != 1000 {
 		t.Fatalf("Len after NewWorkload = %d, want 1000", got)
 	}
@@ -13,7 +13,7 @@ func TestWorkloadPrefillsToCapacity(t *testing.T) {
 }
 
 func TestWorkloadRunKeepsCacheFull(t *testing.T) {
-	w := NewWorkload(1000)
+	w := NewWorkload(1000, ListLayout)
 	w.Run(50_000)
 	if got := w.Cache().Len(); got != 1000 {
 		t.Fatalf("Len after Run = %d, want 1000", got)
@@ -21,7 +21,7 @@ func TestWorkloadRunKeepsCacheFull(t *testing.T) {
 }
 
 func TestWorkloadIsDeterministic(t *testing.T) {
-	a, b := NewWorkload(100), NewWorkload(100)
+	a, b := NewWorkload(100, ListLayout), NewWorkload(100, ListLayout)
 	a.Run(1000)
 	b.Run(1000)
 	for k := int64(0); k < a.Keys(); k++ {
@@ -45,7 +45,7 @@ func newKeys(w *Workload, capacity int64) int {
 }
 
 func TestWorkloadAllReadsNeverPut(t *testing.T) {
-	w := NewWorkload(1000)
+	w := NewWorkload(1000, ListLayout)
 	w.SetReadRatio(100)
 	w.Run(50_000)
 	if got := newKeys(w, 1000); got != 0 {
@@ -54,7 +54,7 @@ func TestWorkloadAllReadsNeverPut(t *testing.T) {
 }
 
 func TestWorkloadAllWritesPut(t *testing.T) {
-	w := NewWorkload(1000)
+	w := NewWorkload(1000, ListLayout)
 	w.SetReadRatio(0)
 	w.Run(50_000)
 	if got := newKeys(w, 1000); got == 0 {
@@ -63,7 +63,7 @@ func TestWorkloadAllWritesPut(t *testing.T) {
 }
 
 func TestWorkloadClampsReadRatio(t *testing.T) {
-	w := NewWorkload(10)
+	w := NewWorkload(10, ListLayout)
 	w.SetReadRatio(250)
 	if w.ReadRatio() != 100 {
 		t.Fatalf("ReadRatio = %d, want 100", w.ReadRatio())

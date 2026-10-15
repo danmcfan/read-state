@@ -16,6 +16,7 @@ import (
 var (
 	w       *readstate.Workload
 	readPct = readstate.DefaultReadRatio // kept across init, so a new cache keeps the reader's setting
+	layout  = readstate.ListLayout       // likewise; takes effect at the next init
 )
 
 func main() {
@@ -23,7 +24,7 @@ func main() {
 		// init(capacity): build a fresh, pre-filled cache, replacing any old one.
 		"init": js.FuncOf(func(_ js.Value, args []js.Value) any {
 			w = nil // let the old cache be collected before allocating the new one
-			w = readstate.NewWorkload(args[0].Int())
+			w = readstate.NewWorkload(args[0].Int(), layout)
 			w.SetReadRatio(readPct)
 			return nil
 		}),
@@ -32,6 +33,17 @@ func main() {
 			readPct = args[0].Int()
 			if w != nil {
 				w.SetReadRatio(readPct)
+			}
+			return nil
+		}),
+		// setLayout("list" | "slab"): the cache layout for the next init.
+		// Anything else is ignored.
+		"setLayout": js.FuncOf(func(_ js.Value, args []js.Value) any {
+			switch args[0].String() {
+			case "list":
+				layout = readstate.ListLayout
+			case "slab":
+				layout = readstate.SlabLayout
 			}
 			return nil
 		}),

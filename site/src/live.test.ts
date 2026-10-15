@@ -45,11 +45,13 @@ test("isWorkerMessage accepts each message kind and rejects anything else", () =
 });
 
 test("settingsChanges re-inits only when the cache size changes", () => {
-  const s = { capacity: 1000, batch: 10, readPct: 50 };
-  expect(settingsChanges(s, s)).toEqual({ init: false, readRatio: false });
-  expect(settingsChanges(s, { ...s, batch: 20 })).toEqual({ init: false, readRatio: false });
-  expect(settingsChanges(s, { ...s, readPct: 90 })).toEqual({ init: false, readRatio: true });
-  expect(settingsChanges(s, { ...s, capacity: 2000 })).toEqual({ init: true, readRatio: false });
+  const s = { capacity: 1000, batch: 10, readPct: 50, goLayout: "list" } as const;
+  const none = { init: false, readRatio: false, layout: false };
+  expect(settingsChanges(s, s)).toEqual(none);
+  expect(settingsChanges(s, { ...s, batch: 20 })).toEqual(none);
+  expect(settingsChanges(s, { ...s, readPct: 90 })).toEqual({ ...none, readRatio: true });
+  expect(settingsChanges(s, { ...s, capacity: 2000 })).toEqual({ ...none, init: true });
+  expect(settingsChanges(s, { ...s, goLayout: "slab" })).toEqual({ ...none, layout: true });
 });
 
 test("formatCount abbreviates thousands and millions", () => {

@@ -3,9 +3,9 @@
 // Shared by the worker (browser) and wasm.test.ts (Bun), which differ only in
 // the base URL: http(s) in the browser, file:// under Bun.
 
-import { isRecord, type HeapStats, type Lang } from "./live.ts";
+import { isRecord, type GoLayout, type HeapStats, type Lang } from "./live.ts";
 
-/** The API both builds expose; only Go has `heapStats`. */
+/** The API both builds expose; only Go has `heapStats`, `forceGC` and `setLayout`. */
 export interface Cache {
   /** Build a fresh, pre-filled cache of `capacity`, replacing any old one. */
   init(capacity: number): void;
@@ -15,6 +15,8 @@ export interface Cache {
   runBatch(n: number): number;
   heapStats?: () => HeapStats;
   forceGC?: () => void;
+  /** The layout for the next `init`; kept across `init`. */
+  setLayout?: (layout: GoLayout) => void;
 }
 
 interface GoRuntime {
@@ -47,7 +49,7 @@ function toCache(m: unknown, lang: Lang): Cache {
   if (!isRecord(m) || !isFn(m["init"]) || !isFn(m["setReadRatio"]) || !isFn(m["runBatch"])) {
     throw new Error(`${lang} build does not expose init, setReadRatio and runBatch`);
   }
-  const { init, setReadRatio, runBatch, heapStats, forceGC } = m;
+  const { init, setReadRatio, runBatch, heapStats, forceGC, setLayout } = m;
   const cache: Cache = {
     init: (capacity) => {
       Reflect.apply(init, m, [capacity]);
@@ -68,6 +70,7 @@ function toCache(m: unknown, lang: Lang): Cache {
     };
   }
   if (isFn(forceGC)) cache.forceGC = (): void => void Reflect.apply(forceGC, m, []);
+  if (isFn(setLayout)) cache.setLayout = (layout): void => void Reflect.apply(setLayout, m, [layout]);
   return cache;
 }
 

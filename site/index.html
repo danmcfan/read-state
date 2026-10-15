@@ -181,6 +181,13 @@
         on each pass, a bigger batch makes each point longer, and more reads mean fewer writes, so less new memory for
         Go to collect. At 100% reads, nothing changes in the cache at all.
       </p>
+      <p>
+        Could Go have kept up by holding no pointers? Switch the Go layout to pointer-free and Go refills its cache as
+        one slice of fixed-size slots linked by index, with a map from key to slot index, the same design as the Rust
+        cache. Neither holds a pointer, so the collector marks them as having nothing inside to scan, and a collection
+        costs about the same at 2 million entries as at 100 thousand. Pointers is Discord's original layout: a map of
+        pointers into <code>container/list</code>, where every entry is a heap object the collector must trace.
+      </p>
       <figure class="chart">
         <div class="head">
           <span class="title">Latency per batch, last 30 seconds</span
@@ -202,8 +209,9 @@
       <h2 id="demo"><a class="anchor" href="#demo" aria-label="Link to this section">#</a>Run it yourself</h2>
       <p>
         Both caches live in this repository: <code>cache_list.go</code> (a <code>map</code> plus
-        <code>container/list</code>) and <code>src/lib.rs</code> (a <code>HashMap</code> plus an index-based linked
-        list). The live chart above runs them as WebAssembly.
+        <code>container/list</code>), <code>cache_slab.go</code> (its pointer-free counterpart) and
+        <code>src/lib.rs</code> (a <code>HashMap</code> plus an index-based linked list). The live chart above runs them
+        as WebAssembly.
       </p>
       <div class="cmds">
         <div class="cmd">
