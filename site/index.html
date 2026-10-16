@@ -171,6 +171,47 @@
         cache capacity to 8 million read states, which cut database reads further. Along the way they swapped the
         cache's <code>HashMap</code> for a <code>BTreeMap</code> to save memory.
       </p>
+      <figure class="chart" id="results">
+        <div class="head"><span class="title">What Discord reported after the switch</span></div>
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Metric</th>
+              <th scope="col" class="go">Go</th>
+              <th scope="col" class="rust">Rust</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Latency</th>
+              <td>Spikes roughly every 2 minutes</td>
+              <td>Just as good as Go's, with no spikes; average in microseconds, max @mention in milliseconds</td>
+            </tr>
+            <tr>
+              <th scope="row">CPU</th>
+              <td>Spikes roughly every 2 minutes</td>
+              <td>Consistently lower</td>
+            </tr>
+            <tr>
+              <th scope="row">Memory</th>
+              <td>Baseline</td>
+              <td>Better than Go</td>
+            </tr>
+            <tr>
+              <th scope="row">Cache capacity</th>
+              <td>Kept small to limit GC pauses</td>
+              <td>Raised to 8 million read states</td>
+            </tr>
+          </tbody>
+        </table>
+        <figcaption>
+          From
+          <a href="https://discord.com/blog/why-discord-is-switching-from-go-to-rust"
+            >Why Discord is Switching from Go to Rust</a
+          >
+          (2020). The post gives these results as graphs and prose; it states no exact latency, CPU or memory figures.
+        </figcaption>
+      </figure>
 
       <h2 id="live"><a class="anchor" href="#live" aria-label="Link to this section">#</a>Watch it live</h2>
       <p>
