@@ -178,6 +178,12 @@
         <span class="rust">Rust</span> builds, each in its own worker. Every point is one batch of reads and writes to a
         full cache, run back to back; dashed lines mark Go garbage collections.
       </p>
+      <p id="live-wasm-gc">
+        One thing differs from the problem above: here the spikes follow heap growth, not a two-minute timer. Go's WASM
+        runtime has no background monitor thread, so the forced GC never fires, and every collection is triggered by the
+        heap growing. It is also single-threaded, so each collection pauses the whole program instead of running beside
+        it on other cores.
+      </p>
       <figure class="chart">
         <div class="head">
           <span class="title">Latency per batch, last 30 seconds</span
@@ -188,11 +194,8 @@
         </div>
         <div id="live-chart"></div>
         <figcaption>
-          Browser WASM is slower than native code, so the numbers differ from Discord's servers. Go's WASM runtime is
-          also different from native Go in two ways. It is single-threaded, so each collection pauses the whole program
-          instead of running beside it on other cores. And it has no background monitor thread, so the two-minute forced
-          GC never fires: every collection here is triggered by heap growth. The shape is what matters: watch for Go's
-          spikes when a collection runs.
+          Browser WASM is slower than native code, so the numbers differ from Discord's servers. The shape is what
+          matters: watch for Go's spikes when a collection runs.
         </figcaption>
       </figure>
 
