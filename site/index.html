@@ -178,7 +178,7 @@
         <span class="rust">Rust</span> builds, each in its own worker. Every point is one batch of reads and writes to a
         full cache, run back to back; dashed lines mark Go garbage collections.
       </p>
-      <p>
+      <p id="live-wasm-gc">
         One thing differs from the problem above: here the spikes follow heap growth, not a two-minute timer. Go's WASM
         runtime has no background monitor thread, so the forced GC never fires, and every collection is triggered by the
         heap growing. It is also single-threaded, so each collection pauses the whole program instead of running beside
