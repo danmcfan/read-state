@@ -245,6 +245,22 @@
         The comparison flatters Go a little: Discord's real read states held more than two integers, and anything with a
         string, timer or pointer in it would put the collector back to work.
       </p>
+      <h2 id="takeaways"><a class="anchor" href="#takeaways" aria-label="Link to this section">#</a>Takeaways</h2>
+      <ul>
+        <li>
+          A garbage collector's cost tracks the size of the live heap, not how much garbage is made. A large, long-lived
+          cache is the worst case: little garbage, but a huge heap to scan on every pass.
+        </li>
+        <li>
+          Moving to <span class="rust">Rust</span> removed the periodic spikes, beat the tuned
+          <span class="go">Go</span> service on latency, CPU and memory, and let Discord grow the cache to 8 million
+          read states.
+        </li>
+        <li>
+          A pointer-free Go layout gets most of the way there: the collector has nothing inside the cache to scan. It
+          only holds while entries have no strings, timers or pointers in them.
+        </li>
+      </ul>
 
       <h2 id="demo"><a class="anchor" href="#demo" aria-label="Link to this section">#</a>Run it yourself</h2>
       <p>
