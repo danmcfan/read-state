@@ -9,7 +9,10 @@ await verify("btree", async (v) => {
   await v.open();
   const text = await v.eval(demo);
   v.check(
-    typeof text === "string" && text.includes("BTreeMap") && text.includes("garbage collection"),
+    typeof text === "string" &&
+      text.includes("BTreeMap") &&
+      text.includes("garbage collection") &&
+      text.includes("preallocates"),
     "the demo paragraph explains the HashMap and BTreeMap choice",
     text,
   );
