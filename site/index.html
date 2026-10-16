@@ -289,8 +289,10 @@
       <p>
         Both caches live in this repository: <code>cache_list.go</code> (a <code>map</code> plus
         <code>container/list</code>), <code>cache_slab.go</code> (its pointer-free counterpart) and
-        <code>src/lib.rs</code> (a <code>HashMap</code> plus an index-based linked list). The live chart above runs them
-        as WebAssembly.
+        <code>src/lib.rs</code> (a <code>HashMap</code> or <code>BTreeMap</code> plus an index-based linked list). The
+        live chart above runs them as WebAssembly, with Rust on the <code>HashMap</code>: the demo compares garbage
+        collection, not map memory, and a <code>HashMap</code> preallocates for the full capacity, as the Go caches do,
+        where a <code>BTreeMap</code> can't.
       </p>
       <div class="cmds">
         <div class="cmd">
