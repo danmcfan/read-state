@@ -1,6 +1,6 @@
 #!/bin/sh
 # Format and lint-fix the staged files before each commit; the full gate
-# (`bun run check`) runs on pre-push and in CI. Installed by `bun install`.
+# (`bun run check`) runs in CI. Installed by `bun install`.
 set -e
 
 files=$(git diff --cached --name-only --diff-filter=ACMR)
