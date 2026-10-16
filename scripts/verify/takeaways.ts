@@ -12,7 +12,7 @@ await verify("takeaways", async (v) => {
   const points = await v.eval("document.querySelectorAll('#takeaways ~ ul > li').length");
   v.check(points === 3, "the list has three points", points);
   const followsDemo = await v.eval(
-    "document.querySelector('#takeaways')?.previousElementSibling?.querySelector('#live-chart') != null",
+    "(() => { const t = document.querySelector('#takeaways'), c = document.querySelector('#live-chart'); return t != null && c != null && (c.compareDocumentPosition(t) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0; })()",
   );
   v.check(followsDemo === true, "the section follows the live demo", followsDemo);
   await v.screenshot("takeaways", "#takeaways");
