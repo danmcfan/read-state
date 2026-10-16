@@ -147,24 +147,6 @@
           each entry dies.
         </figcaption>
       </figure>
-      <div class="cards">
-        <div class="card go-card">
-          <h3 class="go">Go version</h3>
-          <ul>
-            <li>Garbage collected</li>
-            <li>Spikes every ~2 minutes as the GC scans the cache</li>
-            <li>Bigger cache meant bigger GC pauses</li>
-          </ul>
-        </div>
-        <div class="card rust-card">
-          <h3 class="rust">Rust version</h3>
-          <ul>
-            <li>No GC; ownership frees memory on eviction</li>
-            <li>No periodic spikes</li>
-            <li>Cache could grow without a GC cost</li>
-          </ul>
-        </div>
-      </div>
       <p>
         Discord reported that even with only basic optimization, the Rust port outperformed the hand-tuned Go service,
         and after some profiling it beat Go on latency, CPU, and memory. Without a GC cost, they could also raise the
