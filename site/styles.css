@@ -322,53 +322,10 @@ figure.chart .title {
     monospace;
   fill: var(--muted);
 }
-.plot .line {
-  fill: none;
-  stroke-width: 2;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-  stroke-dasharray: 1;
-  stroke-dashoffset: 0;
-}
-.plot.draw .line {
-  animation: draw 1.4s ease-out both;
-}
-@keyframes draw {
-  from {
-    stroke-dashoffset: 1;
-  }
-}
-.tip {
-  position: absolute;
-  pointer-events: none;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 6px 9px;
-  font:
-    0.8rem/1.45 ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    monospace;
-  box-shadow: 0 6px 16px rgb(0 0 0 / 0.12);
-  white-space: nowrap;
-}
 figcaption {
   color: var(--muted);
   font-size: 0.85rem;
   margin-top: 8px;
-}
-details {
-  margin-top: 6px;
-  font-size: 0.85rem;
-  color: var(--muted);
-}
-details summary {
-  cursor: pointer;
-}
-details .scroll {
-  max-height: 260px;
-  overflow: auto;
 }
 
 .live-bar {

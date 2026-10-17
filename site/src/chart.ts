@@ -1,4 +1,4 @@
-// Pure SVG chart math shared by the recorded CPU chart and the live chart.
+// Pure SVG chart math for the live chart.
 
 /** One value `v` at time `t`, in whatever units the chart plots. */
 export interface Point {
@@ -21,7 +21,7 @@ export interface Scale {
   yMax: number;
 }
 
-/** Both charts use a 680x250 viewBox with this plot area. */
+/** The chart uses a 680x250 viewBox with this plot area. */
 export const BOX: Box = { left: 44, top: 22, width: 624, height: 200 };
 
 export function xAt(t: number, scale: Scale, box: Box): number {

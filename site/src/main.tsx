@@ -3,7 +3,6 @@
 import type { JSX } from "react";
 import { createRoot } from "react-dom/client";
 import { CopyButton } from "./CopyButton.tsx";
-import { CpuChart, CpuTable } from "./CpuChart.tsx";
 import { GcPauseBars, GcTimelineDiagram, LruDiagram, ReadStatesDiagram, RewriteDiagram } from "./Diagrams.tsx";
 import { LiveChart } from "./LiveChart.tsx";
 import { ThemeToggle } from "./ThemeToggle.tsx";
@@ -19,8 +18,6 @@ mount("read-states-diagram", <ReadStatesDiagram />);
 mount("lru-diagram", <LruDiagram />);
 mount("gc-diagram", <GcTimelineDiagram />);
 mount("rewrite-diagram", <RewriteDiagram />);
-mount("cpu-chart", <CpuChart />);
-mount("cpu-table", <CpuTable />);
 mount("live-chart", <LiveChart />);
 mount("gc-pause-bars", <GcPauseBars />);
 

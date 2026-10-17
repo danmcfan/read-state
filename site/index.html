@@ -115,25 +115,6 @@
         </figcaption>
       </figure>
 
-      <figure class="chart">
-        <div class="head">
-          <span class="title">CPU in an earlier native run</span
-          ><span class="legend"
-            ><span><i style="background: var(--go-fill)"></i>Go</span
-            ><span><i style="background: var(--rust-fill)"></i>Rust</span></span
-          >
-        </div>
-        <div id="cpu-chart"></div>
-        <figcaption>
-          A real 10-minute run of an earlier native version of this repo's demo on a 10-core Mac, with all four programs
-          running at once. The repo has since dropped two of those programs, which shared the machine during this run;
-          isolated measurements will replace this chart. CPU is sampled every 5 seconds; 100% is one core. Dashed lines
-          mark Go's forced collections from <code>GODEBUG=gctrace=1</code>. Each one spent 4 to 22 seconds of CPU
-          marking a heap of 1.1 to 1.6 GB, taking longer as the cache filled.
-        </figcaption>
-        <div id="cpu-table"></div>
-      </figure>
-
       <h2 id="fix"><a class="anchor" href="#fix" aria-label="Link to this section">#</a>The fix: rewrite it in Rust</h2>
       <p>
         <span class="rust">Rust</span> has no garbage collector. Memory is freed as soon as its owner goes out of scope,
