@@ -1,6 +1,6 @@
-// `bun run verify page`: the article renders its components (the copy buttons,
-// no recorded CPU chart), in light and dark themes: the system theme by
-// default, the toggle's choice once made.
+// `bun run verify page`: the article renders its components (the GC schematic
+// leading into the fix, the copy buttons), in light and dark themes: the system
+// theme by default, the toggle's choice once made.
 
 import { verify } from "../harness.ts";
 
@@ -36,7 +36,7 @@ await verify("page", async (v) => {
     "document.querySelector('#cpu-chart, #cpu-table') === null && !document.body.textContent.includes('CPU in an earlier')",
   );
   v.check(gone === true, "the stale CPU chart and its table are gone", gone);
-  const next = await v.eval("document.querySelector('#gc-diagram').closest('figure').nextElementSibling?.id");
+  const next = await v.eval("document.querySelector('#gc-diagram')?.closest('figure')?.nextElementSibling?.id");
   v.check(next === "fix", "the GC schematic leads straight into the fix", next);
   const buttons = await v.eval("document.querySelectorAll('.cmd button').length");
   v.check(buttons === 2, "2 copy buttons", buttons);
