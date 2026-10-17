@@ -13,8 +13,6 @@
 | Build       | `bun run build`        | The site bundles into `dist/`.                                                                                                                                                                                                                                                                                                     |
 | Native      | `bun run test:native`  | `go vet`, `go test` and `cargo test`.                                                                                                                                                                                                                                                                                              |
 
-The pre-commit hook formats and lint-fixes the staged files (Go with `golangci-lint fmt`, Rust with `rustfmt`), so most findings are fixed before they reach the gate. `bun install` installs it, along with a pre-push hook that blocks pushes to `main`.
-
 Browser checks (`bun run verify`) are not in the gate: they need agent-browser and a local Chrome. Run them for any change to `site/` (`docs/agents/verification.md`).
 
 ## Fix the code, not the rules

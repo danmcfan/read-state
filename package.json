@@ -3,7 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "prepare": "git config core.hooksPath .githooks",
     "dev": "bunx --bun vite",
     "build": "bunx --bun vite build",
     "preview": "bunx --bun vite preview",
